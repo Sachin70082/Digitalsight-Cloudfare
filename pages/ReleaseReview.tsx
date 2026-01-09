@@ -448,7 +448,7 @@ const ReleaseReview: React.FC = () => {
                             value={feedbackNote}
                             onChange={(e) => setFeedbackNote(e.target.value)}
                             rows={6}
-                            className="w-full block bg-black/40 border-gray-700 rounded-[1.25rem]"
+                            className="w-full block bg-black/40 border-gray-700 p-4 rounded-[1.25rem]"
                             autoFocus
                         />
                     </div>
