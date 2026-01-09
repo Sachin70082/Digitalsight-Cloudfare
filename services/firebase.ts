@@ -5,13 +5,13 @@ import { getStorage } from 'firebase/storage';
 
 // Replace with your actual Firebase project credentials
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyC67cYqknT8GbQ-4zUg5hZXBQ209kDs1vI",
+  authDomain: "digitalsight-7d498.firebaseapp.com",
+  projectId: "digitalsight-7d498",
+  storageBucket: "digitalsight-7d498.firebasestorage.app",
+  messagingSenderId: "220340840910",
+  appId: "1:220340840910:web:4db9a30eec3f3916cde39f",
+  measurementId: "G-43564EVJ55"
 };
 
 const app = initializeApp(firebaseConfig);
