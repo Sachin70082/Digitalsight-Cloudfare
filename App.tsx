@@ -17,6 +17,9 @@ import Network from './pages/Network';
 import Employees from './pages/Employees';
 import Notices from './pages/Notices';
 import CorrectionQueue from './pages/CorrectionQueue';
+import Accounting from './pages/Accounting';
+import Support from './pages/Support';
+import FAQ from './pages/FAQ';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -133,6 +136,10 @@ const App: React.FC = () => {
                     <Route path="correction-queue" element={<CorrectionQueue />} />
                   </>
               )}
+
+              <Route path="accounting" element={<Accounting />} />
+              <Route path="support" element={<Support />} />
+              <Route path="faq" element={<FAQ />} />
 
               <Route path="settings" element={<Settings />} />
 

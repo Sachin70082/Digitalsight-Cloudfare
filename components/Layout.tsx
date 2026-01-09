@@ -1,10 +1,79 @@
 
-import React, { useContext } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import React, { useContext, useState, useRef, useEffect } from 'react';
+import { NavLink, Outlet, Link } from 'react-router-dom';
 import { UserRole } from '../types';
 import { AppContext } from '../App';
-import { DashboardIcon, MusicIcon, BuildingIcon, LogoutIcon, UserGroupIcon } from './Icons';
+import { DashboardIcon, MusicIcon, BuildingIcon, LogoutIcon, UserGroupIcon, MenuIcon, CashIcon, SupportIcon, QuestionMarkIcon } from './Icons';
 import UniversalSearch from './UniversalSearch';
+
+const HubMenu: React.FC = () => {
+    const [isOpen, setIsOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const hubItems = [
+        { name: 'Financials', icon: <CashIcon className="w-5 h-5" />, path: '/accounting', color: 'text-primary' },
+        { name: 'Customer Support', icon: <SupportIcon className="w-5 h-5" />, path: '/support', color: 'text-blue-400', external: true },
+        { name: 'FAQ & Docs', icon: <QuestionMarkIcon className="w-5 h-5" />, path: '/faq', color: 'text-purple-400', external: true },
+    ];
+
+    return (
+        <div className="relative mb-2 px-4" ref={menuRef}>
+            <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg transition-all border ${isOpen ? 'bg-primary/10 border-primary text-primary' : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800'}`}
+            >
+                <MenuIcon className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase tracking-wider">Apps Hub</span>
+                <div className="ml-auto">
+                    <svg className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+            </button>
+
+            {isOpen && (
+                <div className="absolute bottom-full left-4 right-4 mb-2 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-slide-up z-50">
+                    <div className="p-2 space-y-1">
+                        {hubItems.map((item) => (
+                            item.external ? (
+                                <a 
+                                    key={item.name}
+                                    href={`/#${item.path}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => setIsOpen(false)}
+                                    className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors group"
+                                >
+                                    <span className={`${item.color} group-hover:scale-110 transition-transform`}>{item.icon}</span>
+                                    <span className="text-xs font-semibold text-gray-300 group-hover:text-white">{item.name}</span>
+                                    <svg className="ml-auto w-3 h-3 text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                </a>
+                            ) : (
+                                <Link
+                                    key={item.name}
+                                    to={item.path}
+                                    onClick={() => setIsOpen(false)}
+                                    className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors group"
+                                >
+                                    <span className={`${item.color} group-hover:scale-110 transition-transform`}>{item.icon}</span>
+                                    <span className="text-xs font-semibold text-gray-300 group-hover:text-white">{item.name}</span>
+                                </Link>
+                            )
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const Layout: React.FC = () => {
     const { user, logout } = useContext(AppContext);
@@ -70,6 +139,7 @@ const Layout: React.FC = () => {
                     ))}
                 </nav>
                 <div className="p-4 border-t border-gray-800">
+                    {!isPlatformSide && <HubMenu />}
                     <div className="mb-4 px-4 py-2 bg-gray-800/50 rounded-lg">
                         <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Logged in as</p>
                         <p className="text-xs text-white truncate font-medium">{user.name}</p>
