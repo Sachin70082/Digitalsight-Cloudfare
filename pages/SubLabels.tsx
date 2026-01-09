@@ -72,8 +72,8 @@ const SubLabels: React.FC = () => {
                 setSubLabels(prev => prev.map(l => l.id === editingLabelId ? { ...l, name: newName } : l));
                 setIsModalOpen(false);
             } else {
-                // Create New
-                const result = await api.createSubLabel({
+                // Fixed: Corrected api.createSubLabel to api.createLabel as createLabel handles both primary and sub-labels
+                const result = await api.createLabel({
                     name: newName,
                     adminEmail: newEmail,
                     permissions,
