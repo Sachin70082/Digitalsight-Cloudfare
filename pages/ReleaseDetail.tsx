@@ -170,6 +170,7 @@ const ReleaseDetail: React.FC = () => {
                                 <MetaItem label="C-Line (Copyright)" value={release.cLine} />
                                 <MetaItem label="Explicit Content" value={release.explicit ? 'Yes (Advisory)' : 'Clean / Safe'} />
                                 <MetaItem label="Publisher" value={release.publisher} />
+                                <MetaItem label="YouTube Content ID" value={release.youtubeContentId ? 'Enabled' : 'Disabled'} />
                                 <MetaItem label="Creation Timestamp" value={new Date(release.createdAt).toLocaleDateString()} />
                             </div>
                         </CardContent>

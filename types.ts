@@ -207,6 +207,7 @@ export interface Release {
   filmBanner?: string;
   filmCast?: string;
   originalReleaseDate?: string;
+  youtubeContentId?: boolean;
 }
 
 // Added RevenueEntry for accounting features

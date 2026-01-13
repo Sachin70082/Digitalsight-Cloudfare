@@ -239,8 +239,11 @@ const ReleaseList: React.FC = () => {
                                                         )}
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <p className="text-[13px] font-black text-white truncate group-hover:text-primary transition-colors tracking-tight uppercase">
+                                                        <p className="text-[13px] font-black text-white truncate group-hover:text-primary transition-colors tracking-tight uppercase flex items-center">
                                                             {release.title || 'Untitled Session'}
+                                                            {release.youtubeContentId && (
+                                                                <span className="text-[8px] bg-red-600/20 text-red-500 border border-red-600/30 px-1.5 py-0.5 rounded font-black ml-2 align-middle tracking-widest uppercase">CID</span>
+                                                            )}
                                                         </p>
                                                         <p className="text-[10px] text-gray-500 font-bold tracking-widest mt-1 truncate uppercase">
                                                             {artistName}

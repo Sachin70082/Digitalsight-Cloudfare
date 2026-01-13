@@ -16,7 +16,8 @@ const Login: React.FC = () => {
   const [resetSent, setResetSent] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
+  const [rememberMe, setRememberMe] = useState(false);
+  
   const [founderName, setFounderName] = useState('');
   const [founderDesignation, setFounderDesignation] = useState('Founder / CEO');
 
@@ -78,20 +79,20 @@ const Login: React.FC = () => {
   if (pendingFounder) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-900 p-6">
-          <Card className="w-full max-w-lg border-primary/20 bg-gray-800/50 backdrop-blur-2xl shadow-2xl overflow-hidden rounded-[2rem]">
-            <CardHeader className="text-center pt-12 border-none">
-              <div className="w-20 h-20 bg-primary text-black rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-[0_0_40px_rgba(29,185,84,0.3)]">
+          <Card className="w-[95%] max-w-lg border-primary/20 bg-gray-800/50 backdrop-blur-2xl shadow-2xl overflow-hidden rounded-[2rem] p-0">
+            <CardHeader className="text-center pt-8 sm:pt-12 border-none">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary text-black rounded-2xl sm:rounded-3xl flex items-center justify-center mx-auto mb-6 sm:mb-8 shadow-[0_0_40px_rgba(29,185,84,0.3)]">
                   <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
               </div>
-              <CardTitle className="text-3xl font-black text-white uppercase tracking-tight">Root Profile Genesis</CardTitle>
+              <CardTitle className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight">Root Profile Genesis</CardTitle>
               <div className="mt-4 inline-block bg-primary/10 px-4 py-1.5 rounded-full border border-primary/20">
                 <p className="text-primary text-[10px] font-black uppercase tracking-[0.2em]">{pendingFounder.email}</p>
               </div>
             </CardHeader>
-            <CardContent className="pb-16 px-12">
-                <form onSubmit={handleFounderSetup} className="space-y-8">
+            <CardContent className="pb-10 sm:pb-16 px-6 sm:px-12">
+                <form onSubmit={handleFounderSetup} className="space-y-6 sm:space-y-8">
                     <p className="text-sm text-gray-400 text-center leading-relaxed">
                         Security verification successful. Please establish your master administrative identity to access the Digitalsight Core.
                     </p>
@@ -102,18 +103,18 @@ const Login: React.FC = () => {
                             value={founderName} 
                             onChange={e => setFounderName(e.target.value)} 
                             placeholder="e.g. Alexander Pierce"
-                            className="h-14 bg-black/40 border-gray-700 text-base"
+                            className="h-12 sm:h-14 bg-black/40 border-gray-700 text-base"
                         />
-                        <Input 
-                            label="Executive Designation" 
-                            required 
-                            value={founderDesignation} 
-                            onChange={e => setFounderDesignation(e.target.value)} 
+                        <Input
+                            label="Executive Designation"
+                            required
+                            value={founderDesignation}
+                            onChange={e => setFounderDesignation(e.target.value)}
                             placeholder="Founder / CEO"
-                            className="h-14 bg-black/40 border-gray-700 text-base"
+                            className="h-12 sm:h-14 bg-black/40 border-gray-700 text-base"
                         />
                     </div>
-                    <Button type="submit" className="w-full h-16 text-[11px] font-black uppercase tracking-[0.25em] shadow-2xl shadow-primary/30 rounded-2xl" disabled={isLoading}>
+                    <Button type="submit" className="w-full h-14 sm:h-16 text-[11px] font-black uppercase tracking-[0.25em] shadow-2xl shadow-primary/30 rounded-2xl" disabled={isLoading}>
                       {isLoading ? <Spinner className="w-6 h-6" /> : 'Activate Platform Authority'}
                     </Button>
                 </form>
@@ -161,22 +162,28 @@ const Login: React.FC = () => {
       </div>
 
       {/* Optimized Auth Interface - Right */}
-      <div className="w-full lg:w-[45%] flex items-center justify-center p-8 bg-gray-900 relative">
+      <div className="w-full lg:w-[45%] flex items-center justify-center p-4 sm:p-8 bg-gray-900 relative">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.03)_0%,_transparent_70%)] pointer-events-none"></div>
         
         <div className="w-full max-w-lg relative z-10 animate-slide-up">
-          <div className="mb-12 text-center lg:text-left px-4">
-            <h2 className="text-4xl font-black text-white uppercase tracking-tight mb-3">Portal Secure Login</h2>
-            <p className="text-gray-500 font-medium text-lg">Initialize your administrative session to proceed.</p>
+          {/* Mobile Logo/Brand */}
+          <div className="flex lg:hidden items-center justify-center gap-3 mb-8">
+              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-black font-black text-xl shadow-lg shadow-primary/20">D</div>
+              <span className="text-2xl font-black text-white tracking-tighter uppercase">Digitalsight</span>
+          </div>
+
+          <div className="mb-8 sm:mb-12 text-center lg:text-left px-4">
+            <h2 className="text-3xl sm:text-4xl font-black text-white uppercase tracking-tight mb-3">Portal Secure Login</h2>
+            <p className="text-gray-500 font-medium text-base sm:text-lg">Initialize your administrative session to proceed.</p>
           </div>
 
           <Card className="border border-white/5 bg-white/[0.02] backdrop-blur-3xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] p-0 overflow-hidden rounded-[2.5rem]">
-            <CardContent className="p-12">
+            <CardContent className="p-6 sm:p-12">
               {!isForgotMode ? (
                   <form onSubmit={handleLogin} className="space-y-8">
                     <div className="space-y-6">
                         <div className="relative group">
-                            <div className="absolute left-5 top-[3.1rem] text-gray-600 group-focus-within:text-primary transition-colors">
+                            <div className="absolute left-5 top-[2.6rem] sm:top-[3.1rem] text-gray-600 group-focus-within:text-primary transition-colors">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" /></svg>
                             </div>
                             <Input
@@ -187,11 +194,11 @@ const Login: React.FC = () => {
                               onChange={(e) => setEmail(e.target.value)}
                               placeholder="admin@digitalsight.pro"
                               required
-                              className="h-16 pl-14 bg-black/40 border-gray-800 focus:border-primary text-base placeholder:text-gray-700 transition-all rounded-2xl"
+                              className="h-14 sm:h-16 pl-14 bg-black/40 border-gray-800 focus:border-primary text-base placeholder:text-gray-700 transition-all rounded-2xl"
                             />
                         </div>
                         <div className="relative group">
-                            <div className="absolute left-5 top-[3.1rem] text-gray-600 group-focus-within:text-primary transition-colors">
+                            <div className="absolute left-5 top-[2.6rem] sm:top-[3.1rem] text-gray-600 group-focus-within:text-primary transition-colors">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                             </div>
                             <Input
@@ -202,12 +209,12 @@ const Login: React.FC = () => {
                               onChange={(e) => setPassword(e.target.value)}
                               placeholder="••••••••"
                               required
-                              className="h-16 pl-14 pr-14 bg-black/40 border-gray-800 focus:border-primary text-base placeholder:text-gray-700 transition-all rounded-2xl"
+                              className="h-14 sm:h-16 pl-14 pr-14 bg-black/40 border-gray-800 focus:border-primary text-base placeholder:text-gray-700 transition-all rounded-2xl"
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-5 top-[3.1rem] text-gray-600 hover:text-primary transition-colors"
+                                className="absolute right-5 top-[2.6rem] sm:top-[3.1rem] text-gray-600 hover:text-primary transition-colors"
                             >
                                 {showPassword ? (
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>
@@ -219,6 +226,23 @@ const Login: React.FC = () => {
                                 <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest">Protected by Enterprise Security</p>
                             </div>
                         </div>
+                        
+                        <div className="flex items-center justify-between px-1">
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <div className="relative flex items-center justify-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={rememberMe}
+                                        onChange={(e) => setRememberMe(e.target.checked)}
+                                        className="peer appearance-none w-5 h-5 border-2 border-gray-800 rounded-md bg-black/40 checked:bg-primary checked:border-primary transition-all cursor-pointer"
+                                    />
+                                    <svg className="absolute w-3.5 h-3.5 text-black opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <span className="text-[10px] sm:text-[11px] font-black text-gray-500 uppercase tracking-widest group-hover:text-gray-300 transition-colors">Remember Session</span>
+                            </label>
+                        </div>
                     </div>
 
                     {error && (
@@ -228,7 +252,7 @@ const Login: React.FC = () => {
                         </div>
                     )}
 
-                    <Button type="submit" className="w-full h-16 flex justify-center py-4 text-xs font-black uppercase tracking-[0.25em] shadow-[0_20px_40px_-10px_rgba(29,185,84,0.3)] hover:shadow-[0_20px_40px_-5px_rgba(29,185,84,0.4)] rounded-2xl transition-all" disabled={isLoading}>
+                    <Button type="submit" className="w-full h-14 sm:h-16 flex justify-center py-4 text-xs font-black uppercase tracking-[0.25em] shadow-[0_20px_40px_-10px_rgba(29,185,84,0.3)] hover:shadow-[0_20px_40px_-5px_rgba(29,185,84,0.4)] rounded-2xl transition-all" disabled={isLoading}>
                       {isLoading ? <Spinner className="w-6 h-6" /> : 'Initialize Secure Session'}
                     </Button>
                     
@@ -246,20 +270,20 @@ const Login: React.FC = () => {
                   <form onSubmit={handleForgot} className="space-y-8">
                       {resetSent ? (
                           <div className="text-center space-y-8">
-                              <div className="bg-primary/10 text-primary p-10 rounded-[2rem] border border-primary/20">
-                                  <div className="w-16 h-16 bg-primary text-black rounded-full flex items-center justify-center mx-auto mb-6">
-                                      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                              <div className="bg-primary/10 text-primary p-6 sm:p-10 rounded-[2rem] border border-primary/20">
+                                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary text-black rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+                                      <svg className="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                                   </div>
-                                  <p className="font-black text-xl uppercase tracking-tight mb-2">Protocol Dispatched</p>
-                                  <p className="text-gray-400 font-medium leading-relaxed">A secure credential restoration link has been synchronized to your primary email address.</p>
+                                  <p className="font-black text-lg sm:text-xl uppercase tracking-tight mb-2">Protocol Dispatched</p>
+                                  <p className="text-gray-400 text-sm sm:text-base font-medium leading-relaxed">A secure credential restoration link has been synchronized to your primary email address.</p>
                               </div>
-                              <Button variant="secondary" className="w-full h-16 text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl" onClick={() => {setIsForgotMode(false); setResetSent(false);}}>Return to Authentication</Button>
+                              <Button variant="secondary" className="w-full h-14 sm:h-16 text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl" onClick={() => {setIsForgotMode(false); setResetSent(false);}}>Return to Authentication</Button>
                           </div>
                       ) : (
                           <>
                             <div className="space-y-3">
-                                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Recover Access</h3>
-                                <p className="text-base text-gray-500 font-medium leading-relaxed">Enter your registered organizational email. We will transmit restoration instructions via encrypted endpoint.</p>
+                                <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">Recover Access</h3>
+                                <p className="text-sm sm:text-base text-gray-500 font-medium leading-relaxed">Enter your registered organizational email. We will transmit restoration instructions via encrypted endpoint.</p>
                             </div>
                             <Input
                                 label="Registered Domain Email"
@@ -268,7 +292,7 @@ const Login: React.FC = () => {
                                 value={forgotEmail}
                                 onChange={(e) => setForgotEmail(e.target.value)}
                                 placeholder="your@email.com"
-                                className="h-16 bg-black/40 border-gray-800 text-base rounded-2xl"
+                                className="h-14 sm:h-16 bg-black/40 border-gray-800 text-base rounded-2xl"
                             />
                             {error && (
                                 <div className="bg-red-500/10 border border-red-500/20 p-5 rounded-2xl flex items-start gap-4 animate-shake">
@@ -277,10 +301,10 @@ const Login: React.FC = () => {
                                 </div>
                             )}
                             <div className="flex flex-col gap-4 pt-4">
-                                <Button type="submit" disabled={isLoading} className="h-16 text-[11px] font-black uppercase tracking-[0.25em] rounded-2xl shadow-xl shadow-primary/20">
+                                <Button type="submit" disabled={isLoading} className="h-14 sm:h-16 text-[11px] font-black uppercase tracking-[0.25em] rounded-2xl shadow-xl shadow-primary/20">
                                     {isLoading ? <Spinner className="w-6 h-6" /> : 'Transmit Recovery Link'}
                                 </Button>
-                                <Button variant="secondary" className="h-14 text-[11px] font-black uppercase tracking-widest rounded-2xl" onClick={() => setIsForgotMode(false)}>Abort Recovery</Button>
+                                <Button variant="secondary" className="h-12 sm:h-14 text-[11px] font-black uppercase tracking-widest rounded-2xl" onClick={() => setIsForgotMode(false)}>Abort Recovery</Button>
                             </div>
                           </>
                       )}
@@ -289,11 +313,11 @@ const Login: React.FC = () => {
             </CardContent>
           </Card>
           
-          <div className="mt-16 text-center">
-              <p className="text-[11px] text-gray-700 font-black uppercase tracking-[0.5em] flex items-center justify-center gap-3">
-                  <span className="h-px w-8 bg-gray-800"></span>
+          <div className="mt-8 sm:mt-16 text-center">
+              <p className="text-[9px] sm:text-[11px] text-gray-700 font-black uppercase tracking-[0.3em] sm:tracking-[0.5em] flex items-center justify-center gap-2 sm:gap-3">
+                  <span className="h-px w-4 sm:w-8 bg-gray-800"></span>
                   Digitalsight Security Architecture v3.4
-                  <span className="h-px w-8 bg-gray-800"></span>
+                  <span className="h-px w-4 sm:w-8 bg-gray-800"></span>
               </p>
           </div>
         </div>
