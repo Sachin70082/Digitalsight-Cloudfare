@@ -88,7 +88,8 @@ const ReleaseForm: React.FC<ReleaseFormProps> = ({ onClose, onSave, initialRelea
         filmCast: '',
         originalReleaseDate: '',
         tracks: [],
-        notes: []
+        notes: [],
+        youtubeContentId: false
     });
 
     useEffect(() => {
@@ -524,6 +525,28 @@ const ReleaseForm: React.FC<ReleaseFormProps> = ({ onClose, onSave, initialRelea
                                 </div>
                             )}
                             <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if(f) handleArtworkSelect(f); }} />
+                        </div>
+
+                        <div className="mt-12 w-full max-w-lg">
+                            <div className="p-6 bg-black/20 rounded-[2rem] border border-gray-800 hover:border-primary/30 transition-all group">
+                                <label className="flex items-center gap-4 cursor-pointer">
+                                    <div className="relative flex items-center justify-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.youtubeContentId}
+                                            onChange={(e) => handleChange('youtubeContentId', e.target.checked)}
+                                            className="peer appearance-none w-6 h-6 border-2 border-gray-700 rounded-lg bg-black/40 checked:bg-primary checked:border-primary transition-all"
+                                        />
+                                        <svg className="absolute w-4 h-4 text-black opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="4">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-black text-white uppercase tracking-tight">YouTube Content ID</span>
+                                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Enable digital fingerprinting for automated copyright protection</span>
+                                    </div>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 )}

@@ -395,6 +395,7 @@ const ReleaseReview: React.FC = () => {
                             <MetaItem label="Phonographic (P)" value={release.pLine} />
                             <MetaItem label="Copyright (C)" value={release.cLine} />
                             <MetaItem label="Advisory Status" value={release.explicit ? 'E - Explicit Content' : 'Clean / Safe'} />
+                            <MetaItem label="YouTube Content ID" value={release.youtubeContentId ? 'Enabled' : 'Disabled'} />
                         </CardContent>
                     </Card>
                     
