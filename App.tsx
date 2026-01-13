@@ -29,7 +29,7 @@ type ToastType = 'success' | 'error' | 'info';
 type AppContextType = {
   user: User | null;
   pendingFounder: FirebaseUser | null;
-  login: (email: string, password?: string) => Promise<void>;
+  login: (email: string, password?: string, recaptchaToken?: string) => Promise<void>;
   completeFounderSetup: (name: string, designation: string) => Promise<void>;
   logout: () => void;
   showToast: (message: string, type?: ToastType) => void;
@@ -93,8 +93,8 @@ const App: React.FC = () => {
     setIsLoading(false);
   }, []);
 
-  const login = useCallback(async (email: string, password?: string) => {
-    const result = await api.login(email, password);
+  const login = useCallback(async (email: string, password?: string, recaptchaToken?: string) => {
+    const result = await api.login(email, password, recaptchaToken);
     
     if (result && 'needsProfile' in result) {
         setPendingFounder(result.firebaseUser);
