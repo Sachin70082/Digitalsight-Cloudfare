@@ -76,8 +76,33 @@ const ownerPermissions: UserPermissions = {
 };
 
 export const api = {
-  login: async (email: string, password?: string): Promise<User | { needsProfile: true, firebaseUser: FirebaseUser } | undefined> => {
+  login: async (email: string, password?: string, recaptchaToken?: string): Promise<User | { needsProfile: true, firebaseUser: FirebaseUser } | undefined> => {
     if (!password) throw new Error('Password required.');
+
+    // reCAPTCHA Verification
+    if (recaptchaToken) {
+        try {
+            const response = await fetch(`https://recaptchaenterprise.googleapis.com/v1/projects/digitalsight-1766421526484/assessments?key=AIzaSyA3Km1Lrjpfa7pzUqzmSZs77JIRjH-CPfs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    event: {
+                        token: recaptchaToken,
+                        siteKey: '6LeLuDMsAAAAAFbt7or2TUzG2I6TIBKAeuQKOxyT',
+                        expectedAction: 'login'
+                    }
+                })
+            });
+            const assessment = await response.json();
+            if (!assessment.tokenProperties?.valid || assessment.riskAnalysis?.score < 0.5) {
+                console.error("[Auth Pipeline] reCAPTCHA verification failed:", assessment);
+                throw new Error('Security verification failed. Please try again.');
+            }
+        } catch (err: any) {
+            console.error("[Auth Pipeline] reCAPTCHA error:", err);
+            throw new Error(err.message || 'Security protocol error.');
+        }
+    }
     
     const cleanEmail = email.trim().toLowerCase();
     const isMasterEmail = cleanEmail === 'digitalsight.owner@gmail.com';

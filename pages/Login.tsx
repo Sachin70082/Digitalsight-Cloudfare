@@ -15,6 +15,7 @@ const Login: React.FC = () => {
   const [isForgotMode, setIsForgotMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const [founderName, setFounderName] = useState('');
   const [founderDesignation, setFounderDesignation] = useState('Founder / CEO');
@@ -36,7 +37,7 @@ const Login: React.FC = () => {
         throw new Error('Security verification failed.');
       }
       
-      await login(email, password);
+      await login(email, password, token);
     } catch (err: any) {
       let message = 'Access Denied. Check your credentials.';
       // Normalize Firebase v10 combined error codes
@@ -196,13 +197,24 @@ const Login: React.FC = () => {
                             <Input
                               label="Access Credential"
                               id="password"
-                              type="password"
+                              type={showPassword ? "text" : "password"}
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
                               placeholder="••••••••"
                               required
-                              className="h-16 pl-14 bg-black/40 border-gray-800 focus:border-primary text-base placeholder:text-gray-700 transition-all rounded-2xl"
+                              className="h-16 pl-14 pr-14 bg-black/40 border-gray-800 focus:border-primary text-base placeholder:text-gray-700 transition-all rounded-2xl"
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-5 top-[3.1rem] text-gray-600 hover:text-primary transition-colors"
+                            >
+                                {showPassword ? (
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>
+                                ) : (
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                )}
+                            </button>
                             <div className="flex justify-center py-2">
                                 <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest">Protected by Enterprise Security</p>
                             </div>
