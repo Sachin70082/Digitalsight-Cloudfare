@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { AppContext } from '../App';
 import { api } from '../services/mockApi';
 import { Release, ReleaseStatus, Artist, Label } from '../types';
-import { Badge, Card, PageLoader, Input, Pagination } from '../components/ui';
+import { Badge, Card, PageLoader, Input, Pagination, Table, THead, TBody, TR, TH, TD } from '../components/ui';
 
 const CorrectionQueue: React.FC = () => {
     const { user } = useContext(AppContext);
@@ -94,67 +94,65 @@ const CorrectionQueue: React.FC = () => {
             </div>
 
             <Card className="p-0 overflow-hidden border-yellow-500/20 bg-yellow-500/[0.02]">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="text-[10px] text-gray-500 uppercase bg-yellow-500/[0.05] font-black tracking-[0.2em]">
-                            <tr>
-                                <th className="px-8 py-5">Session Target</th>
-                                <th className="px-8 py-5">Node Source</th>
-                                <th className="px-8 py-5">Audit Timestamp</th>
-                                <th className="px-8 py-5">Status</th>
-                                <th className="px-8 py-5 text-right">Gate</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                            {paginatedReleases.map(release => {
-                                const artistName = artists.get(release.primaryArtistIds[0])?.name || 'Untitled';
-                                const labelName = labels.get(release.labelId)?.name || 'Unknown Node';
-                                return (
-                                    <tr key={release.id} className="hover:bg-yellow-500/[0.03] transition-colors group">
-                                        <td className="px-8 py-6">
-                                            <div className="flex items-center gap-5">
-                                                <div className="w-14 h-14 bg-black rounded-xl overflow-hidden shadow-2xl border border-white/10 group-hover:scale-105 transition-transform">
-                                                    <img 
-                                                        src={release.artworkUrl} 
-                                                        className="w-full h-full object-cover" 
-                                                        alt="" 
-                                                        loading="lazy"
-                                                        decoding="async"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[13px] font-black text-white group-hover:text-yellow-500 transition-colors tracking-tight uppercase">{release.title}</p>
-                                                    <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">{artistName}</p>
-                                                </div>
+                <Table>
+                    <THead>
+                        <TR className="bg-yellow-500/[0.05]">
+                            <TH>Session Target</TH>
+                            <TH>Node Source</TH>
+                            <TH>Audit Timestamp</TH>
+                            <TH>Status</TH>
+                            <TH className="text-right">Gate</TH>
+                        </TR>
+                    </THead>
+                    <TBody>
+                        {paginatedReleases.map(release => {
+                            const artistName = artists.get(release.primaryArtistIds[0])?.name || 'Untitled';
+                            const labelName = labels.get(release.labelId)?.name || 'Unknown Node';
+                            return (
+                                <TR key={release.id} className="hover:bg-yellow-500/[0.03]">
+                                    <TD>
+                                        <div className="flex items-center gap-5">
+                                            <div className="w-14 h-14 bg-black rounded-xl overflow-hidden shadow-2xl border border-white/10 group-hover:scale-105 transition-transform">
+                                                <img
+                                                    src={release.artworkUrl}
+                                                    className="w-full h-full object-cover"
+                                                    alt=""
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                />
                                             </div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <p className="text-[11px] text-gray-300 font-black uppercase tracking-tight">{labelName}</p>
-                                            <p className="text-[9px] text-gray-600 font-mono mt-1">UPC: {release.upc || 'PENDING'}</p>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <p className="text-[11px] text-gray-400 font-mono font-bold">{new Date(release.updatedAt).toLocaleDateString()}</p>
-                                            <p className="text-[9px] text-gray-600 font-mono uppercase mt-1">{new Date(release.updatedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                                        </td>
-                                        <td className="px-8 py-6"><Badge status={release.status} /></td>
-                                        <td className="px-8 py-6 text-right">
-                                            <Link to={`/release/${release.id}`} className="inline-block bg-yellow-500 text-black font-black text-[9px] uppercase tracking-[0.2em] px-6 py-2.5 rounded-full hover:bg-yellow-400 transition-all shadow-xl shadow-yellow-500/10">
-                                                Audit Meta
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                            {paginatedReleases.length === 0 && (
-                                <tr>
-                                    <td colSpan={5} className="py-40 text-center text-gray-700 uppercase font-black tracking-widest text-xs opacity-40">
-                                        The correction queue is currently sterilized.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                            <div>
+                                                <p className="text-[13px] font-black text-white group-hover:text-yellow-500 transition-colors tracking-tight uppercase">{release.title}</p>
+                                                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">{artistName}</p>
+                                            </div>
+                                        </div>
+                                    </TD>
+                                    <TD>
+                                        <p className="text-[11px] text-gray-300 font-black uppercase tracking-tight">{labelName}</p>
+                                        <p className="text-[9px] text-gray-600 font-mono mt-1">UPC: {release.upc || 'PENDING'}</p>
+                                    </TD>
+                                    <TD>
+                                        <p className="text-[11px] text-gray-400 font-mono font-bold">{new Date(release.updatedAt).toLocaleDateString()}</p>
+                                        <p className="text-[9px] text-gray-600 font-mono uppercase mt-1">{new Date(release.updatedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                    </TD>
+                                    <TD><Badge status={release.status} /></TD>
+                                    <TD className="text-right">
+                                        <Link to={`/release/${release.id}`} className="inline-block bg-yellow-500 text-black font-black text-[9px] uppercase tracking-[0.2em] px-6 py-2.5 rounded-full hover:bg-yellow-400 transition-all shadow-xl shadow-yellow-500/10">
+                                            Audit Meta
+                                        </Link>
+                                    </TD>
+                                </TR>
+                            );
+                        })}
+                        {paginatedReleases.length === 0 && (
+                            <TR>
+                                <TD colSpan={5} className="py-40 text-center text-gray-700 uppercase font-black tracking-widest text-xs opacity-40">
+                                    The correction queue is currently sterilized.
+                                </TD>
+                            </TR>
+                        )}
+                    </TBody>
+                </Table>
                 <Pagination 
                     totalItems={filteredReleases.length}
                     itemsPerPage={itemsPerPage}

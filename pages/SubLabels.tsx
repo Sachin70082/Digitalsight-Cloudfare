@@ -27,6 +27,13 @@ const SubLabels: React.FC = () => {
         canSubmitAlbums: true
     });
 
+    // Blocking State
+    const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+    const [labelToBlock, setLabelToBlock] = useState<Label | null>(null);
+    const [blockReason, setBlockReason] = useState('');
+    const [isBlocking, setIsBlocking] = useState(false);
+    const [blockedStatus, setBlockedStatus] = useState<Record<string, boolean>>({});
+
     const fetchSubLabels = async () => {
         if (user?.labelId) {
             setIsLoading(true);
@@ -44,6 +51,59 @@ const SubLabels: React.FC = () => {
     useEffect(() => {
         fetchSubLabels();
     }, [user]);
+
+    useEffect(() => {
+        const fetchBlockedStatuses = async () => {
+            const statuses: Record<string, boolean> = {};
+            for (const label of subLabels) {
+                const admin = await api.getLabelAdmin(label.id);
+                if (admin && admin.isBlocked) {
+                    statuses[label.id] = true;
+                }
+            }
+            setBlockedStatus(statuses);
+        };
+        if (subLabels.length > 0) {
+            fetchBlockedStatuses();
+        }
+    }, [subLabels]);
+
+    const handleOpenBlock = async (label: Label) => {
+        setLabelToBlock(label);
+        setBlockReason('');
+        const admin = await api.getLabelAdmin(label.id);
+        if (admin && admin.isBlocked) {
+             setBlockReason(admin.blockReason || '');
+        }
+        setIsBlockModalOpen(true);
+    };
+
+    const confirmBlock = async () => {
+        if (!user || !labelToBlock) return;
+        setIsBlocking(true);
+        try {
+            const admin = await api.getLabelAdmin(labelToBlock.id);
+            if (admin) {
+                if (blockedStatus[labelToBlock.id]) {
+                    await api.unblockUser(admin.id);
+                    showToast(`Access restored for "${labelToBlock.name}".`, 'success');
+                    setBlockedStatus(prev => ({ ...prev, [labelToBlock.id]: false }));
+                } else {
+                    await api.blockUser(admin.id, blockReason);
+                    showToast(`Access suspended for "${labelToBlock.name}".`, 'success');
+                    setBlockedStatus(prev => ({ ...prev, [labelToBlock.id]: true }));
+                }
+            } else {
+                showToast('No admin found for this label.', 'error');
+            }
+            setIsBlockModalOpen(false);
+            setLabelToBlock(null);
+        } catch (err: any) {
+            showToast(err.message || 'Action failed.', 'error');
+        } finally {
+            setIsBlocking(false);
+        }
+    };
 
     const handleOpenEdit = async (label: Label) => {
         setEditingLabelId(label.id);
@@ -143,22 +203,33 @@ const SubLabels: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {paginatedLabels.map(label => (
-                    <Card key={label.id} className="hover:border-primary/50 border border-white/5 bg-white/[0.02] transition-all group p-0 overflow-hidden rounded-[2rem] shadow-2xl">
+                    <Card key={label.id} className="p-0 overflow-hidden group">
                         <div className="p-8">
-                            <CardHeader className="border-b border-white/5 pb-4 mb-4 flex flex-row justify-between items-start">
+                            <CardHeader className="flex flex-row justify-between items-start">
                                 <div className="min-w-0">
                                     <CardTitle className="group-hover:text-primary transition-colors truncate text-xl font-black uppercase tracking-tight">{label.name}</CardTitle>
                                     <p className="text-[9px] font-mono text-gray-600 mt-2 uppercase tracking-tighter">NODE ID: {label.id?.toUpperCase() || 'UNKNOWN'}</p>
                                 </div>
-                                <button onClick={() => handleDelete(label)} className="text-gray-600 hover:text-red-500 transition-colors p-2 bg-white/5 rounded-xl">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => handleOpenBlock(label)}
+                                        className={`p-2 rounded-xl transition-all ${blockedStatus[label.id] ? 'text-red-500 bg-red-500/10 hover:bg-red-500/20' : 'text-gray-600 hover:text-yellow-500 hover:bg-yellow-500/10'}`}
+                                        title={blockedStatus[label.id] ? "Unblock Node" : "Block Node"}
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                    </button>
+                                    <button onClick={() => handleDelete(label)} className="text-gray-600 hover:text-red-500 transition-colors p-2 bg-white/5 rounded-xl">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
+                                </div>
                             </CardHeader>
                             <CardContent className="pt-2">
                                 <div className="space-y-6">
-                                    <div className="flex justify-between items-center bg-black/20 p-3 rounded-xl border border-white/5">
-                                        <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Authority Status</span>
-                                        <span className="text-[10px] bg-primary/10 border border-primary/20 px-3 py-0.5 rounded-full text-primary font-black uppercase">Active</span>
+                                    <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl border border-white/5">
+                                        <span className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] ml-1">Authority Status</span>
+                                        <span className={`text-[10px] px-4 py-1 rounded-full font-black uppercase tracking-wider ${blockedStatus[label.id] ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
+                                            {blockedStatus[label.id] ? 'Suspended' : 'Active'}
+                                        </span>
                                     </div>
                                     <div className="flex gap-3">
                                         <Button variant="secondary" className="flex-1 text-[9px] font-black uppercase tracking-widest py-3 rounded-xl border-white/5" onClick={() => handleOpenEdit(label)}>Edit Rights</Button>
@@ -172,6 +243,55 @@ const SubLabels: React.FC = () => {
             </div>
 
             <Pagination totalItems={subLabels.length} itemsPerPage={itemsPerPage} currentPage={currentPage} onPageChange={setCurrentPage} />
+
+            {/* Block Confirmation Modal */}
+            <Modal
+                isOpen={isBlockModalOpen}
+                onClose={() => !isBlocking && setIsBlockModalOpen(false)}
+                title={blockedStatus[labelToBlock?.id || ''] ? "Restore Access Protocol" : "Suspend Access Protocol"}
+                size="md"
+            >
+                <div className="space-y-6 text-center py-4">
+                    <div className={`w-20 h-20 rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 border animate-pulse ${blockedStatus[labelToBlock?.id || ''] ? 'bg-green-900/20 text-green-500 border-green-500/20' : 'bg-red-900/20 text-red-500 border-red-500/20'}`}>
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <h3 className="text-2xl font-black text-white uppercase tracking-tight">{blockedStatus[labelToBlock?.id || ''] ? "Confirm Restoration" : "Confirm Suspension"}</h3>
+                        <p className="text-gray-500 font-medium leading-relaxed">
+                            {blockedStatus[labelToBlock?.id || '']
+                                ? <span>You are about to restore access for <span className="text-white font-bold">"{labelToBlock?.name}"</span>.</span>
+                                : <span>You are about to suspend access for <span className="text-white font-bold">"{labelToBlock?.name}"</span>.</span>
+                            }
+                        </p>
+                    </div>
+
+                    {!blockedStatus[labelToBlock?.id || ''] && (
+                        <div className="text-left">
+                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Suspension Reason</label>
+                            <textarea
+                                value={blockReason}
+                                onChange={e => setBlockReason(e.target.value)}
+                                className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-sm text-white focus:border-red-500 transition-colors"
+                                rows={3}
+                                placeholder="Enter reason for suspension..."
+                            />
+                        </div>
+                    )}
+
+                    <div className="flex gap-4 pt-4">
+                        <Button variant="secondary" className="flex-1 font-black uppercase text-[10px]" onClick={() => setIsBlockModalOpen(false)} disabled={isBlocking}>Cancel</Button>
+                        <Button
+                            variant={blockedStatus[labelToBlock?.id || ''] ? "primary" : "danger"}
+                            className={`flex-1 font-black uppercase text-[10px] ${blockedStatus[labelToBlock?.id || ''] ? 'shadow-xl shadow-primary/20' : 'shadow-xl shadow-red-500/20'}`}
+                            disabled={isBlocking}
+                            onClick={confirmBlock}
+                        >
+                            {isBlocking ? <Spinner className="w-4 h-4" /> : (blockedStatus[labelToBlock?.id || ''] ? 'Restore Access' : 'Suspend Access')}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingLabelId ? "Configure Authority" : "Setup Child Node"} size="2xl">
                 {!newLabelInfo ? (

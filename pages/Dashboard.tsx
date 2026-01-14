@@ -16,14 +16,14 @@ const NOTICE_STYLING: Record<NoticeType, string> = {
 };
 
 const TopStat = ({ title, value, color = "text-white" }: { title: string, value: string | number, color?: string }) => (
-    <div className="bg-gray-800/40 p-5 rounded-2xl border border-gray-700/50 backdrop-blur-md">
-        <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mb-1">{title}</p>
-        <p className={`text-2xl font-bold ${color}`}>{value.toLocaleString()}</p>
+    <div className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 shadow-xl transition-all duration-300 hover:border-primary/20">
+        <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mb-2 ml-1">{title}</p>
+        <p className={`text-3xl font-black ${color} tracking-tight`}>{value.toLocaleString()}</p>
     </div>
 );
 
 const NoticesWidget = ({ notices }: { notices: Notice[] }) => (
-    <Card className="h-full border-gray-800 bg-black/20 backdrop-blur-sm">
+    <Card className="h-full">
         <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
@@ -189,20 +189,20 @@ const PartnerDashboard: React.FC = () => {
         <div className="space-y-6 animate-fade-in">
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                    <Card className="bg-gradient-to-r from-gray-800 to-black border-gray-700 shadow-xl">
-                        <CardContent className="pt-6">
-                            <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">Partner Portal</h2>
+                    <Card className="bg-gradient-to-br from-primary/10 to-transparent">
+                        <CardContent className="pt-2">
+                            <h2 className="text-3xl font-black text-white mb-2 tracking-tight uppercase">Partner Portal</h2>
                             <p className="text-gray-400 text-sm font-medium">Welcome back, {user?.name}. Distribution oversight for <span className="text-primary font-bold uppercase tracking-tight">{user?.role}</span> accounts is active.</p>
-                            <div className="mt-6 flex gap-3">
-                                <Link to="/releases" className="bg-primary text-black font-black uppercase text-[10px] px-6 py-3 rounded-full tracking-widest hover:bg-primary-dark transition-colors">My Catalog</Link>
+                            <div className="mt-8 flex gap-3">
+                                <Link to="/releases" className="bg-primary text-black font-black uppercase text-[10px] px-8 py-4 rounded-xl tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/20">My Catalog</Link>
                                 {user?.role !== UserRole.ARTIST && (
-                                    <Link to="/artists" className="bg-gray-700 text-white font-black uppercase text-[10px] px-6 py-3 rounded-full tracking-widest hover:bg-gray-600 transition-colors">Manage Artists</Link>
+                                    <Link to="/artists" className="bg-white/5 text-white font-black uppercase text-[10px] px-8 py-4 rounded-xl tracking-widest hover:bg-white/10 transition-all border border-white/10">Manage Artists</Link>
                                 )}
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="border-gray-800">
+                    <Card>
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-black text-white uppercase text-[10px] tracking-[0.2em] text-gray-500">Distribution Activity</h3>
                             <Link to="/releases" className="text-[10px] text-primary hover:underline font-black uppercase tracking-wider">Full Catalog</Link>

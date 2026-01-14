@@ -131,7 +131,7 @@ const ReleaseDetail: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4">
                 <div className="lg:col-span-3 space-y-8">
-                    <Card className="overflow-hidden border-gray-800 bg-black/40 shadow-2xl rounded-[2rem]">
+                    <Card className="p-0 overflow-hidden">
                         <div className="relative group">
                             <img src={release.artworkUrl} alt="Cover Art" className="w-full h-auto object-cover aspect-square" />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
@@ -142,7 +142,7 @@ const ReleaseDetail: React.FC = () => {
                         </div>
                     </Card>
 
-                    <Card className="border-gray-800 bg-gray-900/50 rounded-[2rem]">
+                    <Card>
                         <CardHeader className="border-b border-gray-800/50">
                             <CardTitle className="text-[10px] uppercase tracking-[0.2em] text-primary font-black">Audit History & Notes</CardTitle>
                         </CardHeader>
@@ -153,11 +153,11 @@ const ReleaseDetail: React.FC = () => {
                 </div>
 
                 <div className="lg:col-span-9 space-y-8">
-                    <Card className="border-gray-800 shadow-xl bg-gray-900/30 rounded-[2rem]">
-                        <CardHeader className="border-b border-gray-800/50">
+                    <Card>
+                        <CardHeader>
                             <CardTitle className="text-sm uppercase tracking-widest font-black">Session Metadata Overview</CardTitle>
                         </CardHeader>
-                        <CardContent className="pt-8">
+                        <CardContent className="pt-2">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-6">
                                 <MetaItem label="Label Branch" value={label?.name} />
                                 <MetaItem label="Universal Product Code" value={release.upc || 'Pending Allocation'} />
@@ -177,11 +177,11 @@ const ReleaseDetail: React.FC = () => {
                     </Card>
 
                     {(release.filmName || release.filmDirector) && (
-                        <Card className="border-primary/10 bg-primary/5 shadow-xl rounded-[2rem]">
-                            <CardHeader className="border-b border-primary/10">
+                        <Card className="bg-primary/5 border-primary/10">
+                            <CardHeader className="border-primary/10">
                                 <CardTitle className="text-[10px] uppercase tracking-[0.2em] text-primary font-black">Production / Film Sync Data</CardTitle>
                             </CardHeader>
-                            <CardContent className="pt-8 grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-6">
+                            <CardContent className="pt-2 grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-6">
                                 <MetaItem label="Production Name" value={release.filmName} />
                                 <MetaItem label="Director" value={release.filmDirector} />
                                 <MetaItem label="Producer" value={release.filmProducer} />
@@ -192,11 +192,11 @@ const ReleaseDetail: React.FC = () => {
                         </Card>
                     )}
                     
-                    <Card className="border-gray-800 bg-gray-900/40 rounded-[2rem]">
-                        <CardHeader className="border-b border-gray-800/50">
+                    <Card>
+                        <CardHeader>
                             <CardTitle className="text-sm uppercase tracking-widest font-black">Master Tracklist ({ (release.tracks || []).length })</CardTitle>
                         </CardHeader>
-                        <CardContent className="pt-6">
+                        <CardContent className="pt-2">
                             <div className="space-y-6">
                                 {(release.tracks || []).map((track: Track) => {
                                     const primaryArtists = (track.primaryArtistIds || []).map(id => allArtists.get(id)?.name).filter(Boolean).join(', ');
@@ -248,11 +248,11 @@ const ReleaseDetail: React.FC = () => {
                         </CardContent>
                     </Card>
 
-                    <Card className="border-gray-800 bg-gray-900/30 rounded-[2rem]">
+                    <Card>
                         <CardHeader>
                             <CardTitle className="text-sm uppercase tracking-widest font-black">Marketing Copy / Liner Notes</CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="pt-2">
                             <div className="p-8 bg-black/40 rounded-[2rem] border border-gray-800/40 leading-relaxed text-gray-300 whitespace-pre-wrap font-medium text-lg">
                                 {release.description || 'No marketing description provided for this session.'}
                             </div>

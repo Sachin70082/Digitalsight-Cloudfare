@@ -31,18 +31,18 @@ const ArtistSelector: React.FC<ArtistSelectorProps> = ({
   const availableArtists = allArtists.filter(a => !selectedArtistIds.includes(a.id) && !disabledArtistIds.includes(a.id));
 
   return (
-    <div>
-      <label className="block text-sm font-medium text-gray-400 mb-1">{label}</label>
-      <div className="bg-gray-700 border border-gray-600 rounded-md p-2 min-h-[42px]">
+    <div className="space-y-2">
+      <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">{label}</label>
+      <div className="bg-black/20 border border-white/10 rounded-xl p-3 min-h-[56px] transition-all duration-300 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/50">
         {selectedArtists.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2">
+          <div className="flex flex-wrap gap-2 mb-3">
             {selectedArtists.map(artist => (
-              <span key={artist.id} className="bg-primary text-white text-sm font-semibold px-2 py-1 rounded-full flex items-center gap-2">
+              <span key={artist.id} className="bg-primary text-black text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-lg shadow-primary/20">
                 {artist.name}
                 <button
                   type="button"
                   onClick={() => handleRemoveArtist(artist.id)}
-                  className="bg-primary-dark rounded-full h-4 w-4 flex items-center justify-center text-xs"
+                  className="hover:bg-black/10 rounded-full h-4 w-4 flex items-center justify-center transition-colors"
                   aria-label={`Remove ${artist.name}`}
                 >
                   &times;
@@ -55,11 +55,11 @@ const ArtistSelector: React.FC<ArtistSelectorProps> = ({
           <select
             value=""
             onChange={(e) => handleAddArtist(e.target.value)}
-            className="w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-1 text-white text-sm"
+            className="w-full bg-transparent border-none text-white text-sm font-bold outline-none cursor-pointer appearance-none"
           >
-            <option value="">{selectedArtists.length > 0 ? 'Add another artist...' : 'Select artist...'}</option>
+            <option value="" className="bg-gray-900">{selectedArtists.length > 0 ? 'Add another node...' : 'Select node...'}</option>
             {availableArtists.map(artist => (
-              <option key={artist.id} value={artist.id}>{artist.name}</option>
+              <option key={artist.id} value={artist.id} className="bg-gray-900">{artist.name}</option>
             ))}
           </select>
         </div>

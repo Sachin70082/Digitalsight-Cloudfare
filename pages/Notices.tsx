@@ -130,9 +130,9 @@ const Notices: React.FC = () => {
                     const canEdit = isAuthor || currentUser?.role === UserRole.OWNER;
                     
                     return (
-                        <div 
-                            key={notice.id} 
-                            className={`p-6 rounded-3xl border-2 transition-all duration-300 ${NOTICE_STYLING[notice.type]} border-l-[12px] group relative`}
+                        <div
+                            key={notice.id}
+                            className={`p-8 rounded-[2rem] border border-white/5 backdrop-blur-xl transition-all duration-500 ${NOTICE_STYLING[notice.type]} border-l-[12px] group relative hover:border-white/10`}
                         >
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center gap-3">

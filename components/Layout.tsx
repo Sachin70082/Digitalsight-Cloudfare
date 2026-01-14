@@ -78,10 +78,49 @@ const HubMenu: React.FC = () => {
     );
 };
 
+const BlockedView: React.FC<{ reason?: string; onLogout: () => void }> = ({ reason, onLogout }) => (
+    <div className="min-h-screen flex items-center justify-center bg-gray-900 p-6">
+        <div className="max-w-md w-full bg-gray-800 border border-red-500/30 rounded-2xl p-8 text-center shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
+            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <h2 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Account Suspended</h2>
+            <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+                Your account access has been restricted by the administration team.
+            </p>
+            {reason && (
+                <div className="bg-black/30 rounded-xl p-4 mb-6 border border-white/5">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Reason for Suspension</p>
+                    <p className="text-white text-sm font-medium">{reason}</p>
+                </div>
+            )}
+            <div className="space-y-3">
+                <p className="text-xs text-gray-500">Please contact support for resolution:</p>
+                <a href="mailto:help@digitalsight.in" className="inline-flex items-center gap-2 text-primary hover:text-primary-light font-bold transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    help@digitalsight.in
+                </a>
+                <button
+                    onClick={onLogout}
+                    className="mt-6 w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold uppercase text-xs tracking-widest rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                    <LogoutIcon className="w-4 h-4" />
+                    Return to Login
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
 const Layout: React.FC = () => {
     const { user, logout } = useContext(AppContext);
 
     if (!user) return null;
+
+    if (user.isBlocked) {
+        return <BlockedView reason={user.blockReason} onLogout={logout} />;
+    }
 
     const navLinks = [
         { to: "/", text: "Admin Console", icon: <DashboardIcon /> },
@@ -126,8 +165,9 @@ const Layout: React.FC = () => {
     return (
         <div className="flex h-screen bg-gray-900 font-sans">
             <aside className="w-64 bg-black flex-shrink-0 flex flex-col border-r border-gray-800">
-                <div className="h-16 flex items-center justify-center text-primary font-black text-2xl uppercase tracking-tighter">
-                    Digitalsight
+                <div className="h-16 flex items-center px-6 gap-3">
+                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-black font-black text-lg shadow-lg shadow-primary/20">D</div>
+                    <span className="text-xl font-black text-white tracking-tighter uppercase">Digitalsight</span>
                 </div>
                 <div className="px-4 py-2 border-b border-gray-800/50">
                     <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Access Mode</p>

@@ -337,6 +337,14 @@ export const api = {
     return snap.val();
   },
 
+  blockUser: async (userId: string, reason: string): Promise<void> => {
+    await update(ref(db, `users/${userId}`), { isBlocked: true, blockReason: reason });
+  },
+
+  unblockUser: async (userId: string): Promise<void> => {
+    await update(ref(db, `users/${userId}`), { isBlocked: false, blockReason: null });
+  },
+
   sendPasswordResetEmail: async (email: string): Promise<void> => {
     try {
         await sendPasswordResetEmail(auth, email);
@@ -404,6 +412,29 @@ export const api = {
   },
 
   deleteArtist: async (id: string, requester: User): Promise<void> => {
+    // Check for active releases
+    const snapshot = await get(ref(db, 'releases'));
+    const allReleases = ensureArray<Release>(snapshot.val());
+    
+    const activeReleases = allReleases.filter(r => {
+        const isAssociated = (r.primaryArtistIds || []).includes(id) ||
+                             (r.featuredArtistIds || []).includes(id) ||
+                             (r.tracks || []).some(t => (t.primaryArtistIds || []).includes(id) || (t.featuredArtistIds || []).includes(id));
+        
+        // If associated, check status
+        if (!isAssociated) return false;
+        
+        // Allow deletion if status is Draft or Needs Info (Correction)
+        // Block if Pending, Approved, Processed, Published, Takedown, Cancelled (unless we consider Takedown/Cancelled as deletable, but user said "not in draft or correction")
+        // User said: "if album submited by label and not in draft or album is in pending ...then no one should delete"
+        // "if draft or correction need status then any one should modify or delete"
+        return r.status !== ReleaseStatus.DRAFT && r.status !== ReleaseStatus.NEEDS_INFO;
+    });
+
+    if (activeReleases.length > 0) {
+        throw new Error(`Cannot delete artist. Associated with ${activeReleases.length} active release(s). Only artists in Draft or Correction releases can be removed.`);
+    }
+
     await remove(ref(db, `artists/${id}`));
   },
 

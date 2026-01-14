@@ -77,6 +77,8 @@ export interface User {
   artistId?: string; // Only for Artist users
   artistName?: string; // Cache for display
   permissions: UserPermissions;
+  isBlocked?: boolean;
+  blockReason?: string;
 }
 
 export interface InteractionNote {
