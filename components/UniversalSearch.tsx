@@ -72,11 +72,11 @@ const UniversalSearch: React.FC = () => {
   return (
     <>
       {/* Search Backdrop Dimmer */}
-      <div 
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] transition-opacity duration-300 pointer-events-none ${isOpen && query.length > 1 ? 'opacity-100' : 'opacity-0'}`} 
+      <div
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[40] transition-opacity duration-300 pointer-events-none ${isOpen && query.length > 1 ? 'opacity-100' : 'opacity-0'}`}
       />
 
-      <div className="relative w-full max-w-xl z-[100]" ref={containerRef}>
+      <div className="relative w-full max-w-xl z-[50]" ref={containerRef}>
         <div className={`relative transition-all duration-300 transform ${isFocused ? 'scale-[1.02]' : 'scale-100'}`}>
           <input
             type="text"
@@ -106,7 +106,7 @@ const UniversalSearch: React.FC = () => {
         </div>
 
         {isOpen && query.trim().length > 1 && (
-          <div className="absolute top-full mt-3 w-full bg-gray-900/95 border border-white/10 rounded-2xl shadow-2xl z-[100] max-h-[75vh] overflow-hidden backdrop-blur-xl animate-slide-up origin-top">
+          <div className="absolute top-full mt-3 w-full bg-gray-900/95 border border-white/10 rounded-2xl shadow-2xl z-[50] max-h-[75vh] overflow-hidden backdrop-blur-xl animate-slide-up origin-top">
             <div className="overflow-y-auto max-h-[75vh] custom-scrollbar p-2">
               {isSearching && !results && (
                 <div className="py-20 flex flex-col items-center justify-center gap-4 text-gray-400">

@@ -19,6 +19,13 @@ const Labels: React.FC = () => {
     const [labelToDelete, setLabelToDelete] = useState<Label | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    // Blocking State
+    const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+    const [labelToBlock, setLabelToBlock] = useState<Label | null>(null);
+    const [blockReason, setBlockReason] = useState('');
+    const [isBlocking, setIsBlocking] = useState(false);
+    const [blockedStatus, setBlockedStatus] = useState<Record<string, boolean>>({});
+
     // Editing State
     const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
 
@@ -71,6 +78,59 @@ const Labels: React.FC = () => {
     useEffect(() => {
         setCurrentPage(1);
     }, [filter]);
+
+    useEffect(() => {
+        const fetchBlockedStatuses = async () => {
+            const statuses: Record<string, boolean> = {};
+            for (const label of labels) {
+                const admin = await api.getLabelAdmin(label.id);
+                if (admin && admin.isBlocked) {
+                    statuses[label.id] = true;
+                }
+            }
+            setBlockedStatus(statuses);
+        };
+        if (labels.length > 0) {
+            fetchBlockedStatuses();
+        }
+    }, [labels]);
+
+    const handleOpenBlock = async (label: Label) => {
+        setLabelToBlock(label);
+        setBlockReason('');
+        const admin = await api.getLabelAdmin(label.id);
+        if (admin && admin.isBlocked) {
+             setBlockReason(admin.blockReason || '');
+        }
+        setIsBlockModalOpen(true);
+    };
+
+    const confirmBlock = async () => {
+        if (!currentUser || !labelToBlock) return;
+        setIsBlocking(true);
+        try {
+            const admin = await api.getLabelAdmin(labelToBlock.id);
+            if (admin) {
+                if (blockedStatus[labelToBlock.id]) {
+                    await api.unblockUser(admin.id);
+                    showToast(`Access restored for "${labelToBlock.name}".`, 'success');
+                    setBlockedStatus(prev => ({ ...prev, [labelToBlock.id]: false }));
+                } else {
+                    await api.blockUser(admin.id, blockReason);
+                    showToast(`Access suspended for "${labelToBlock.name}".`, 'success');
+                    setBlockedStatus(prev => ({ ...prev, [labelToBlock.id]: true }));
+                }
+            } else {
+                showToast('No admin found for this label.', 'error');
+            }
+            setIsBlockModalOpen(false);
+            setLabelToBlock(null);
+        } catch (err: any) {
+            showToast(err.message || 'Action failed.', 'error');
+        } finally {
+            setIsBlocking(false);
+        }
+    };
 
     // This handles the final API synchronization
     const executeSync = async () => {
@@ -261,9 +321,9 @@ const Labels: React.FC = () => {
             <div className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
                     {paginatedLabels.map(label => (
-                        <Card key={label.id} className="hover:border-primary/50 border border-white/5 bg-white/[0.02] transition-all group relative overflow-hidden p-0 rounded-[2rem] shadow-2xl">
+                        <Card key={label.id} className="p-0 overflow-hidden group">
                             <div className="p-8">
-                                <CardHeader className="border-white/5 pb-6 mb-6 flex flex-row justify-between items-start">
+                                <CardHeader className="flex flex-row justify-between items-start">
                                     <div className="min-w-0">
                                         <CardTitle className="group-hover:text-primary transition-colors truncate text-xl font-black uppercase tracking-tight">{label.name}</CardTitle>
                                         <p className="text-[9px] font-mono text-gray-600 mt-2 uppercase tracking-tighter">NODE ID: {label.id?.toUpperCase() || 'UNKNOWN'}</p>
@@ -277,12 +337,19 @@ const Labels: React.FC = () => {
                                             >
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => handleOpenDelete(label)}
                                                 className="p-2.5 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
                                                 title="Terminate Node"
                                             >
                                                 <TrashIcon className="w-5 h-5" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleOpenBlock(label)}
+                                                className={`p-2.5 rounded-xl transition-all ${blockedStatus[label.id] ? 'text-red-500 bg-red-500/10 hover:bg-red-500/20' : 'text-gray-600 hover:text-yellow-500 hover:bg-yellow-500/10'}`}
+                                                title={blockedStatus[label.id] ? "Unblock Node" : "Block Node"}
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                                             </button>
                                         </div>
                                     )}
@@ -297,6 +364,12 @@ const Labels: React.FC = () => {
                                             <p className="text-[9px] text-gray-600 font-black uppercase tracking-widest">Net Share</p>
                                             <p className="text-base text-primary font-black">{label.revenueShare || 70}%</p>
                                         </div>
+                                    </div>
+                                    <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl border border-white/5">
+                                        <span className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] ml-1">Authority Status</span>
+                                        <span className={`text-[10px] px-4 py-1 rounded-full font-black uppercase tracking-wider ${blockedStatus[label.id] ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
+                                            {blockedStatus[label.id] ? 'Suspended' : 'Active'}
+                                        </span>
                                     </div>
                                 </CardContent>
                             </div>
@@ -444,9 +517,58 @@ const Labels: React.FC = () => {
                 )}
             </Modal>
 
+            {/* Block Confirmation Modal */}
+            <Modal
+                isOpen={isBlockModalOpen}
+                onClose={() => !isBlocking && setIsBlockModalOpen(false)}
+                title={blockedStatus[labelToBlock?.id || ''] ? "Restore Access Protocol" : "Suspend Access Protocol"}
+                size="md"
+            >
+                <div className="space-y-6 text-center py-4">
+                    <div className={`w-20 h-20 rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 border animate-pulse ${blockedStatus[labelToBlock?.id || ''] ? 'bg-green-900/20 text-green-500 border-green-500/20' : 'bg-red-900/20 text-red-500 border-red-500/20'}`}>
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <h3 className="text-2xl font-black text-white uppercase tracking-tight">{blockedStatus[labelToBlock?.id || ''] ? "Confirm Restoration" : "Confirm Suspension"}</h3>
+                        <p className="text-gray-500 font-medium leading-relaxed">
+                            {blockedStatus[labelToBlock?.id || '']
+                                ? <span>You are about to restore access for <span className="text-white font-bold">"{labelToBlock?.name}"</span>.</span>
+                                : <span>You are about to suspend access for <span className="text-white font-bold">"{labelToBlock?.name}"</span>.</span>
+                            }
+                        </p>
+                    </div>
+
+                    {!blockedStatus[labelToBlock?.id || ''] && (
+                        <div className="text-left">
+                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Suspension Reason</label>
+                            <textarea
+                                value={blockReason}
+                                onChange={e => setBlockReason(e.target.value)}
+                                className="w-full bg-black/40 border border-gray-700 rounded-xl p-4 text-sm text-white focus:border-red-500 transition-colors"
+                                rows={3}
+                                placeholder="Enter reason for suspension..."
+                            />
+                        </div>
+                    )}
+
+                    <div className="flex gap-4 pt-4">
+                        <Button variant="secondary" className="flex-1 font-black uppercase text-[10px]" onClick={() => setIsBlockModalOpen(false)} disabled={isBlocking}>Cancel</Button>
+                        <Button
+                            variant={blockedStatus[labelToBlock?.id || ''] ? "primary" : "danger"}
+                            className={`flex-1 font-black uppercase text-[10px] ${blockedStatus[labelToBlock?.id || ''] ? 'shadow-xl shadow-primary/20' : 'shadow-xl shadow-red-500/20'}`}
+                            disabled={isBlocking}
+                            onClick={confirmBlock}
+                        >
+                            {isBlocking ? <Spinner className="w-4 h-4" /> : (blockedStatus[labelToBlock?.id || ''] ? 'Restore Access' : 'Suspend Access')}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
             {/* Deletion Confirmation Modal */}
-            <Modal 
-                isOpen={isDeleteModalOpen} 
+            <Modal
+                isOpen={isDeleteModalOpen}
                 onClose={() => !isDeleting && setIsDeleteModalOpen(false)} 
                 title="Node Termination Protocol" 
                 size="md"

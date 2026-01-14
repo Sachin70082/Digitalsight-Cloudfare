@@ -3,7 +3,7 @@ import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { AppContext } from '../App';
 import { api } from '../services/mockApi';
 import { Artist, ArtistType, User, UserRole, Label } from '../types';
-import { Button, Card, Input, Modal, Spinner, PageLoader, Pagination } from '../components/ui';
+import { Button, Card, Input, Modal, Spinner, PageLoader, Pagination, Table, THead, TBody, TR, TH, TD } from '../components/ui';
 
 const ArtistForm: React.FC<{
     initialData?: Artist, 
@@ -260,69 +260,67 @@ const Artists: React.FC = () => {
                         <Button onClick={() => { setEditingArtist(null); setNewCredentials(null); setJustCreated(null); setIsModalOpen(true); }} className="h-12 text-[10px] px-8 font-black uppercase tracking-widest shadow-xl shadow-primary/20">Onboard Artist</Button>
                     </div>
                 </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="text-[10px] text-gray-500 uppercase bg-black/10 font-black tracking-[0.2em]">
-                            <tr>
-                                <th className="px-8 py-5">Artist / Visual Identity</th>
-                                <th className="px-8 py-5">Core Role</th>
-                                <th className="px-8 py-5">Secured Endpoint</th>
-                                <th className="px-8 py-5">Linked Mappings</th>
-                                <th className="px-8 py-5 text-right">Administrative</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                            {paginatedArtists.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="p-32 text-center text-gray-600 uppercase font-black tracking-widest text-xs opacity-50">
-                                        No artist profiles matched your parameters.
-                                    </td>
-                                </tr>
-                            ) : paginatedArtists.map(artist => (
-                                <tr key={artist.id} className="hover:bg-white/[0.02] transition-colors group">
-                                    <td className="px-8 py-5">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dark text-black rounded-xl flex items-center justify-center font-black shadow-lg shadow-primary/10">
-                                                {artist.name.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <p className="font-black text-white group-hover:text-primary transition-colors tracking-tight uppercase text-sm">{artist.name}</p>
-                                                <p className="text-[9px] text-gray-600 font-mono mt-0.5 tracking-tighter uppercase">NODE ID: {artist.id?.toUpperCase() || 'UNKNOWN'}</p>
-                                            </div>
+                <Table>
+                    <THead>
+                        <TR>
+                            <TH>Artist / Visual Identity</TH>
+                            <TH>Core Role</TH>
+                            <TH>Secured Endpoint</TH>
+                            <TH>Linked Mappings</TH>
+                            <TH className="text-right">Administrative</TH>
+                        </TR>
+                    </THead>
+                    <TBody>
+                        {paginatedArtists.length === 0 ? (
+                            <TR>
+                                <TD colSpan={5} className="p-32 text-center text-gray-600 uppercase font-black tracking-widest text-xs opacity-50">
+                                    No artist profiles matched your parameters.
+                                </TD>
+                            </TR>
+                        ) : paginatedArtists.map(artist => (
+                            <TR key={artist.id}>
+                                <TD>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dark text-black rounded-xl flex items-center justify-center font-black shadow-lg shadow-primary/10">
+                                            {artist.name.charAt(0)}
                                         </div>
-                                    </td>
-                                    <td className="px-8 py-5 text-[11px] font-black uppercase tracking-widest text-gray-400">{artist.type}</td>
-                                    <td className="px-8 py-5 text-[11px] font-mono text-gray-500">{artist.email || <span className="text-gray-700 opacity-50 font-sans font-bold">REDACTED</span>}</td>
-                                    <td className="px-8 py-5">
-                                        <div className="flex gap-2">
-                                            {artist.spotifyId && <span className="text-[9px] bg-primary/10 text-primary px-2.5 py-1 rounded-full border border-primary/20 font-black uppercase tracking-widest">Spotify</span>}
-                                            {artist.appleMusicId && <span className="text-[9px] bg-red-500/10 text-red-500 px-2.5 py-1 rounded-full border border-red-500/20 font-black uppercase tracking-widest">Apple</span>}
-                                            {artist.instagramUrl && <span className="text-[9px] bg-purple-500/10 text-purple-500 px-2.5 py-1 rounded-full border border-purple-500/20 font-black uppercase tracking-widest">Social</span>}
+                                        <div>
+                                            <p className="font-black text-white group-hover:text-primary transition-colors tracking-tight uppercase text-sm">{artist.name}</p>
+                                            <p className="text-[9px] text-gray-600 font-mono mt-0.5 tracking-tighter uppercase">NODE ID: {artist.id?.toUpperCase() || 'UNKNOWN'}</p>
                                         </div>
-                                    </td>
-                                    <td className="px-8 py-5 text-right">
-                                        <div className="flex justify-end gap-1">
-                                            <button 
-                                                onClick={() => handleOpenEdit(artist)} 
-                                                className="p-2.5 text-gray-600 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
-                                                title="Edit Profile"
-                                            >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                            </button>
-                                            <button 
-                                                onClick={() => handleOpenDelete(artist)} 
-                                                className="p-2.5 text-gray-600 hover:text-red-500 hover:bg-red-500/5 rounded-xl transition-all"
-                                                title="Terminate Link"
-                                            >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                                    </div>
+                                </TD>
+                                <TD className="text-[11px] font-black uppercase tracking-widest text-gray-400">{artist.type}</TD>
+                                <TD className="text-[11px] font-mono text-gray-500">{artist.email || <span className="text-gray-700 opacity-50 font-sans font-bold">REDACTED</span>}</TD>
+                                <TD>
+                                    <div className="flex gap-2">
+                                        {artist.spotifyId && <span className="text-[9px] bg-primary/10 text-primary px-2.5 py-1 rounded-full border border-primary/20 font-black uppercase tracking-widest">Spotify</span>}
+                                        {artist.appleMusicId && <span className="text-[9px] bg-red-500/10 text-red-500 px-2.5 py-1 rounded-full border border-red-500/20 font-black uppercase tracking-widest">Apple</span>}
+                                        {artist.instagramUrl && <span className="text-[9px] bg-purple-500/10 text-purple-500 px-2.5 py-1 rounded-full border border-purple-500/20 font-black uppercase tracking-widest">Social</span>}
+                                    </div>
+                                </TD>
+                                <TD className="text-right">
+                                    <div className="flex justify-end gap-1">
+                                        <button
+                                            onClick={() => handleOpenEdit(artist)}
+                                            className="p-2.5 text-gray-600 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
+                                            title="Edit Profile"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                        </button>
+                                        <button
+                                            onClick={() => handleOpenDelete(artist)}
+                                            className="p-2.5 text-gray-600 hover:text-red-500 hover:bg-red-500/5 rounded-xl transition-all"
+                                            title="Terminate Link"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                        </button>
+                                    </div>
+                                </TD>
+                            </TR>
+                        ))}
+                    </TBody>
+                </Table>
                 <Pagination 
                     totalItems={filteredArtists.length}
                     itemsPerPage={itemsPerPage}

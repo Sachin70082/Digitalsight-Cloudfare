@@ -280,11 +280,11 @@ const ReleaseReview: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-4 space-y-6">
-                    <Card className="overflow-hidden border-gray-800 bg-black/40 shadow-2xl rounded-[2.5rem] p-0">
+                    <Card className="p-0 overflow-hidden">
                         <img src={release.artworkUrl} alt="Artwork" className="w-full h-auto object-cover aspect-square" />
                     </Card>
 
-                    <Card className="border border-primary/30 bg-primary/[0.02] rounded-[2rem] p-8">
+                    <Card className="border-primary/30 bg-primary/[0.02]">
                         <CardHeader className="border-none p-0 mb-6 text-center">
                             <CardTitle className="text-[11px] font-black uppercase text-primary tracking-[0.25em]">Distribution Engine</CardTitle>
                         </CardHeader>
@@ -304,17 +304,17 @@ const ReleaseReview: React.FC = () => {
                         </CardContent>
                     </Card>
 
-                    <Card className="rounded-[2rem] border-gray-800 bg-gray-900/30">
-                        <CardHeader className="border-b border-white/5 flex flex-row items-center justify-between pb-4">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle className="text-[10px] uppercase tracking-widest text-gray-500 font-black">Audit Journal</CardTitle>
                             <span className="text-[9px] bg-black/40 px-2 py-0.5 rounded border border-white/5 font-mono text-gray-600">v{ (release.notes?.length || 0) + 1 }.0</span>
                         </CardHeader>
-                        <CardContent className="pt-6">
+                        <CardContent className="pt-2">
                             <InteractionLog notes={release.notes || []} />
                         </CardContent>
                     </Card>
 
-                    <Card className="border-red-500/20 bg-red-500/[0.02] rounded-[2rem] p-8">
+                    <Card className="border-red-500/20 bg-red-500/[0.02]">
                         <CardHeader className="border-none p-0 mb-6"><CardTitle className="text-sm font-black uppercase tracking-widest text-red-500">Security Gate</CardTitle></CardHeader>
                         <CardContent className="space-y-4 p-0">
                              <div className="grid grid-cols-1 gap-3">
@@ -380,8 +380,8 @@ const ReleaseReview: React.FC = () => {
                 </div>
 
                 <div className="lg:col-span-8 space-y-8">
-                    <Card className="rounded-[2.5rem] border-gray-800 bg-gray-900/40 shadow-xl overflow-hidden">
-                        <CardHeader className="flex flex-row justify-between items-center bg-black/20 border-b border-white/5 px-10 py-6">
+                    <Card className="p-0 overflow-hidden">
+                        <CardHeader className="flex flex-row justify-between items-center bg-black/20 px-10 py-6">
                             <CardTitle className="text-sm font-black uppercase tracking-widest">Vault Meta Registry</CardTitle>
                             <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-4 py-1 rounded-full font-black uppercase">UPC: {release.upc}</span>
                         </CardHeader>
@@ -399,8 +399,8 @@ const ReleaseReview: React.FC = () => {
                         </CardContent>
                     </Card>
                     
-                    <Card className="rounded-[2.5rem] border-gray-800 bg-gray-900/40 shadow-xl overflow-hidden">
-                        <CardHeader className="bg-black/20 border-b border-white/5 px-10 py-6">
+                    <Card className="p-0 overflow-hidden">
+                        <CardHeader className="bg-black/20 px-10 py-6">
                             <CardTitle className="text-sm font-black uppercase tracking-widest">Binary Asset Integrity (QC)</CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">

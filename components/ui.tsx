@@ -40,12 +40,12 @@ interface CardProps {
   className?: string;
 }
 export const Card: React.FC<CardProps> = ({ children, className = '' }) => (
-  <div className={`bg-gray-800 rounded-2xl shadow-2xl p-6 ${className}`}>
+  <div className={`bg-white/[0.02] backdrop-blur-2xl border border-white/5 rounded-[2rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] p-6 transition-all duration-500 hover:border-primary/20 ${className}`}>
     {children}
   </div>
 );
 export const CardHeader: React.FC<CardProps> = ({ children, className = '' }) => (
-  <div className={`border-b border-white/5 pb-4 mb-4 ${className}`}>
+  <div className={`border-b border-white/5 pb-6 mb-6 ${className}`}>
     {children}
   </div>
 );
@@ -63,11 +63,11 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ label, id, className = '', ...props }, ref) => (
     <div className="space-y-2 w-full">
-        {label && <label htmlFor={id} className="block text-[11px] font-black text-gray-500 uppercase tracking-widest">{label}</label>}
+        {label && <label htmlFor={id} className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">{label}</label>}
         <input
             ref={ref}
             id={id}
-            className={`w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all ${className}`}
+            className={`w-full bg-black/20 border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-300 ${className}`}
             {...props}
         />
     </div>
@@ -79,11 +79,11 @@ interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
 }
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ label, id, className = '', ...props }, ref) => (
     <div className="space-y-2 w-full">
-        {label && <label htmlFor={id} className="block text-[11px] font-black text-gray-500 uppercase tracking-widest">{label}</label>}
+        {label && <label htmlFor={id} className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">{label}</label>}
         <textarea
             ref={ref}
             id={id}
-            className={`w-full block bg-gray-700 border border-gray-600 rounded-xl p-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all min-h-[120px] resize-none ${className}`}
+            className={`w-full block bg-black/20 border border-white/10 rounded-xl p-5 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-300 min-h-[120px] resize-none ${className}`}
             {...props}
         />
     </div>
@@ -104,13 +104,13 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
         sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl', '2xl': 'max-w-2xl', '3xl': 'max-w-3xl', '4xl': 'max-w-4xl', '5xl': 'max-w-5xl'
     }
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 animate-fade-in">
-            <div className={`bg-gray-900 border border-white/5 rounded-[2rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] w-full ${sizeClasses[size]} flex flex-col max-h-[95vh]`}>
-                <div className="flex justify-between items-center px-8 py-6 border-b border-white/5">
-                    <h3 className="text-2xl font-black text-white uppercase tracking-tight">{title}</h3>
-                    <button onClick={onClose} className="p-2 text-gray-500 hover:text-white hover:bg-white/5 rounded-xl transition-all">&times;</button>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-xl flex items-center justify-center z-[9999] p-4 sm:p-6 animate-fade-in">
+            <div className={`bg-gray-900 border border-white/10 rounded-[2rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.9)] w-full ${sizeClasses[size]} flex flex-col max-h-[90vh] relative overflow-hidden`}>
+                <div className="flex justify-between items-center px-8 py-5 border-b border-white/5 bg-white/[0.02] flex-shrink-0">
+                    <h3 className="text-xl font-black text-white uppercase tracking-tight">{title}</h3>
+                    <button onClick={onClose} className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-xl transition-all text-2xl leading-none">&times;</button>
                 </div>
-                <div className="p-8 overflow-y-auto custom-scrollbar">
+                <div className="p-8 overflow-y-auto custom-scrollbar flex-grow">
                     {children}
                 </div>
             </div>
@@ -132,6 +132,41 @@ export const PageLoader: React.FC = () => (
         </div>
         <p className="mt-8 text-gray-500 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Synchronizing Cloud Data</p>
     </div>
+);
+
+// --- Table ---
+export const Table: React.FC<{ children: ReactNode, className?: string }> = ({ children, className = '' }) => (
+    <div className={`overflow-x-auto custom-scrollbar ${className}`}>
+        <table className="w-full text-left border-collapse">
+            {children}
+        </table>
+    </div>
+);
+
+export const THead: React.FC<{ children: ReactNode }> = ({ children }) => (
+    <thead className="text-[10px] text-gray-500 uppercase bg-white/[0.02] font-black tracking-[0.2em]">
+        {children}
+    </thead>
+);
+
+export const TBody: React.FC<{ children: ReactNode }> = ({ children }) => (
+    <tbody className="divide-y divide-white/5">
+        {children}
+    </tbody>
+);
+
+export const TH: React.FC<{ children: ReactNode, className?: string }> = ({ children, className = '' }) => (
+    <th className={`px-8 py-5 font-black ${className}`}>{children}</th>
+);
+
+export const TD: React.FC<{ children: ReactNode, className?: string }> = ({ children, className = '' }) => (
+    <td className={`px-8 py-5 ${className}`}>{children}</td>
+);
+
+export const TR: React.FC<{ children: ReactNode, className?: string }> = ({ children, className = '' }) => (
+    <tr className={`hover:bg-white/[0.02] transition-colors group ${className}`}>
+        {children}
+    </tr>
 );
 
 // --- Pagination ---
