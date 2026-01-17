@@ -1,0 +1,39 @@
+name = "digitalsight-emails"
+main = "worker/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = [ "nodejs_compat" ]
+
+# 1. PRODUCTION DOMAIN SETTINGS
+# Disables the 'digitalsight-emails.xxx.workers.dev' public link
+workers_dev = false
+preview_urls = false
+
+[[routes]]
+pattern = "api.digitalsight.in"
+custom_domain = true
+
+# 2. DATABASE BINDING
+[[d1_databases]]
+binding = "DB"
+database_name = "digitalsight-db"
+database_id = "00047ff4-8b43-4851-9494-87501feff7ae"
+
+# 3. ENVIRONMENT VARIABLES
+[vars]
+TURNSTILE_SECRET_KEY = "0x4AAAAAACMuYPGdx9az4y_HjkPPOU81ZOg"
+JWT_SECRET = "7f3KQ9xMZB8mL2N5A0eS4JdU6HcR1PWaTgVYyFZpXrDkEoO"
+ZEPTOMAIL_API_KEY = "Zoho-enczapikey PHtE6r1YE7ri2TYmp0VS56OxFJH3Z9sq+7tkKQJAuN4WDv4ESk1Sqd4qwTO1rRgiAfhAF/+Yzt9g4ryVtuyNID3lNGlMXWqyqK3sx/VYSPOZsbq6x00Ys1QbcUPcVIPmcdZr1yLVvNrTNA=="
+# Add your CDN URL here for the backend to use
+CDN_URL = "https://cdn.digitalsight.in"
+
+# 4. STORAGE BINDING
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "digitalsight"
+
+# 5. EMAIL BINDING (FIXED SYNTAX)
+# Note: For the new Cloudflare Email Service (beta), use [[send_email]] 
+# or [[email]] depending on your specific beta access. 
+# Below is the standard configuration for sending.
+[[send_email]]
+name = "EMAIL_BINDING"
