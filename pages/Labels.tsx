@@ -3,7 +3,7 @@ import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { AppContext } from '../App';
 import { api } from '../services/mockApi';
 import { Label, User, UserRole, UserPermissions } from '../types';
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, Modal, Spinner, PageLoader, Pagination } from '../components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Modal, Spinner, PageLoader, Pagination, Skeleton } from '../components/ui';
 import { TrashIcon } from '../components/Icons';
 
 const Labels: React.FC = () => {
@@ -291,8 +291,6 @@ const Labels: React.FC = () => {
         return filteredLabels.slice(startIndex, startIndex + itemsPerPage);
     }, [filteredLabels, currentPage]);
 
-    if (isLoading && labels.length === 0) return <PageLoader />;
-
     const canManage = currentUser?.role === UserRole.OWNER ||
                       currentUser?.designation === "Co-Founder / Operations Head" ||
                       currentUser?.permissions?.canOnboardLabels;
@@ -321,7 +319,33 @@ const Labels: React.FC = () => {
 
             <div className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
-                    {paginatedLabels.map(label => (
+                    {isLoading && labels.length === 0 ? (
+                        [...Array(6)].map((_, i) => (
+                            <Card key={i} className="p-0 overflow-hidden group">
+                                <div className="p-8">
+                                    <CardHeader className="flex flex-row justify-between items-start">
+                                        <div className="min-w-0 w-full">
+                                            <Skeleton className="h-6 w-3/4 mb-2" />
+                                            <Skeleton className="h-3 w-1/2" />
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-0 space-y-8">
+                                        <div className="grid grid-cols-2 gap-8">
+                                            <div className="space-y-1">
+                                                <Skeleton className="h-2 w-12" />
+                                                <Skeleton className="h-4 w-20" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Skeleton className="h-2 w-12" />
+                                                <Skeleton className="h-4 w-10" />
+                                            </div>
+                                        </div>
+                                        <Skeleton className="h-10 w-full rounded-2xl" />
+                                    </CardContent>
+                                </div>
+                            </Card>
+                        ))
+                    ) : paginatedLabels.map(label => (
                         <Card key={label.id} className="p-0 overflow-hidden group">
                             <div className="p-8">
                                 <CardHeader className="flex flex-row justify-between items-start">
@@ -385,7 +409,7 @@ const Labels: React.FC = () => {
                     <form onSubmit={(e) => e.preventDefault()} className="space-y-10">
                         <div className="flex justify-between items-center px-10">
                             {['Auth', 'Business', 'Rights'].map((n, i) => (
-                                <React.Fragment key={n}>
+                                <div key={n} className="contents">
                                     <div className="flex flex-col items-center gap-3">
                                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black transition-all ${step > i + 1 ? 'bg-primary text-black' : (step === i + 1 ? 'bg-primary/20 text-primary border border-primary/40' : 'bg-gray-800 text-gray-600')}`}>
                                             {step > i + 1 ? '✓' : i + 1}
@@ -393,7 +417,7 @@ const Labels: React.FC = () => {
                                         <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${step === i + 1 ? 'text-white' : 'text-gray-700'}`}>{n}</span>
                                     </div>
                                     {i < 2 && <div className={`flex-1 h-px mx-6 ${step > i + 1 ? 'bg-primary/50' : 'bg-gray-800'}`} />}
-                                </React.Fragment>
+                                </div>
                             ))}
                         </div>
 

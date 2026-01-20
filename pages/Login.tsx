@@ -197,7 +197,7 @@ const Login: React.FC = () => {
                               type="email"
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
-                              placeholder="admin_email@gmail.com"
+                              placeholder="admin@digitalsight.pro"
                               required
                               className="h-12 sm:h-14 xl:h-16 pl-14 bg-black/40 border-gray-800 focus:border-primary text-sm sm:text-base placeholder:text-gray-700 transition-all rounded-xl sm:rounded-2xl"
                             />
@@ -251,7 +251,7 @@ const Login: React.FC = () => {
                             className="w-full h-12 sm:h-14 xl:h-16 flex items-center justify-center py-4 text-sm sm:text-base font-bold bg-gradient-to-r from-[#1DB954] to-[#169c46] hover:from-[#169c46] hover:to-[#1DB954] text-white shadow-[0_20px_40px_-10px_rgba(29,185,84,0.3)] hover:shadow-[0_20px_40px_-5px_rgba(29,185,84,0.4)] rounded-xl sm:rounded-2xl transition-all duration-300 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed" 
                             disabled={isLoading}
                         >
-                          {isLoading ? <Spinner className="w-6 h-6" /> : 'Sign in to the portal'}
+                          {isLoading ? <Spinner className="w-6 h-6" /> : 'Sign In To Portal'}
                         </button>
                         
                         <div className="text-center">

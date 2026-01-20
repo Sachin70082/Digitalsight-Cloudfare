@@ -3,7 +3,7 @@ import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { AppContext } from '../App';
 import { api } from '../services/mockApi';
 import { Artist, ArtistType, User, UserRole, Label } from '../types';
-import { Button, Card, Input, Modal, Spinner, PageLoader, Pagination, Table, THead, TBody, TR, TH, TD } from '../components/ui';
+import { Button, Card, Input, Modal, Spinner, PageLoader, Pagination, Table, THead, TBody, TR, TH, TD, Skeleton } from '../components/ui';
 
 const ArtistForm: React.FC<{
     initialData?: Artist, 
@@ -236,45 +236,26 @@ const Artists: React.FC = () => {
         return filteredArtists.slice(startIndex, startIndex + itemsPerPage);
     }, [filteredArtists, currentPage]);
 
-    if (isLoading && artists.length === 0) return <PageLoader />;
-
-    return (
-        <div className="space-y-6 animate-fade-in">
-            <Card className="p-0 overflow-hidden">
-                <div className="p-8 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-white/5">
-                    <div>
-                        <h2 className="text-2xl font-black text-white uppercase tracking-tight">
-                            {user?.role === UserRole.OWNER ? 'Master Artist Archive' : 'Managed Artist Roster'}
-                        </h2>
-                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">Includes all sub-label artists assigned to your branch.</p>
-                    </div>
-                    <div className="flex items-center gap-4 w-full md:w-auto">
-                        <div className="relative group flex-1 md:flex-none">
-                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-primary transition-colors">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                            </div>
-                            <Input 
-                                placeholder="Filter records..."
-                                value={filter}
-                                onChange={e => setFilter(e.target.value)}
-                                className="pl-11 h-12 bg-black/20 border-gray-700 w-full md:w-64"
-                            />
-                        </div>
-                        <Button onClick={() => { setEditingArtist(null); setNewCredentials(null); setJustCreated(null); setIsModalOpen(true); }} className="h-12 text-[10px] px-8 font-black uppercase tracking-widest shadow-xl shadow-primary/20">Onboard Artist</Button>
-                    </div>
-                </div>
-                <Table>
-                    <THead>
-                        <TR>
-                            <TH>Artist / Visual Identity</TH>
-                            <TH>Core Role</TH>
-                            <TH>Secured Endpoint</TH>
-                            <TH>Linked Mappings</TH>
-                            <TH className="text-right">Administrative</TH>
-                        </TR>
-                    </THead>
                     <TBody>
-                        {paginatedArtists.length === 0 ? (
+                        {isLoading && artists.length === 0 ? (
+                            [...Array(10)].map((_, i) => (
+                                <TR key={i}>
+                                    <TD>
+                                        <div className="flex items-center gap-4">
+                                            <Skeleton className="w-10 h-10 rounded-xl" />
+                                            <div className="space-y-1">
+                                                <Skeleton className="h-4 w-32" />
+                                                <Skeleton className="h-2 w-20" />
+                                            </div>
+                                        </div>
+                                    </TD>
+                                    <TD><Skeleton className="h-3 w-24" /></TD>
+                                    <TD><Skeleton className="h-3 w-32" /></TD>
+                                    <TD><div className="flex gap-2"><Skeleton className="h-5 w-12 rounded-full" /><Skeleton className="h-5 w-12 rounded-full" /></div></TD>
+                                    <TD className="text-right"><Skeleton className="h-8 w-16 ml-auto rounded-xl" /></TD>
+                                </TR>
+                            ))
+                        ) : paginatedArtists.length === 0 ? (
                             <TR>
                                 <TD colSpan={5} className="p-32 text-center text-gray-600 uppercase font-black tracking-widest text-xs opacity-50">
                                     No artist profiles matched your parameters.
