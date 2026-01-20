@@ -119,8 +119,8 @@ const ReleaseList: React.FC = () => {
         }
     };
 
-    const handleExport = () => {
-        exportReleasesToExcel(filteredReleases, artists, labels);
+    const handleExport = async () => {
+        await exportReleasesToExcel(filteredReleases, artists, labels);
     };
 
     const filteredReleases = useMemo(() => {

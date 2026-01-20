@@ -4,6 +4,7 @@ import { Release, Artist, Label, RevenueEntry } from '../types';
 declare global {
   interface Window {
     XLSX: any;
+    loadXLSX: () => Promise<void>;
   }
 }
 
@@ -20,9 +21,11 @@ const EXCEL_HEADERS = [
   'Film Director', 'Film Producer', 'Film Star Cast / Actors', 'Parental Advisory (Explicit etc)', 
   'IS INSTRUMENTAL', 'Spotify Artist Profile / ID for the track Main Artist', 
   'Spotify Artist Profile / ID for the track Featured Artist', 'Apple Artist ID for Track Main Artist', 
+  'Apple Artist ID for Featured Artist',
   'Apple Artist ID for Remixer', 'Apple Artist ID for Composer', 'Apple Artist ID for Lyricist', 
   'Apple Artist ID for Film Producer', 'Apple Artist ID for Film Director', 'Apple Artist ID for Starcast', 
-  'Facebook page link for Track Main Artist', 'Instagram Artist handle for Track Main Artist'
+  'Facebook page link for Track Main Artist', 'Instagram Artist handle for Track Main Artist',
+  'Instagram Artist handle for Featured Artist'
 ];
 
 const mapReleaseToRows = (release: Release, artists: Map<string, Artist>, labels: Map<string, Label>) => {
@@ -38,10 +41,20 @@ const mapReleaseToRows = (release: Release, artists: Map<string, Artist>, labels
     const trackPrimaryIds = track.primaryArtistIds || [];
     const trackFeaturedIds = track.featuredArtistIds || [];
     
-    const trackMainArtists = trackPrimaryIds.map(id => artists.get(id)?.name).filter(Boolean).join(', ');
-    const trackFeaturedArtists = trackFeaturedIds.map(id => artists.get(id)?.name).filter(Boolean).join(', ');
+    const primaryArtists = trackPrimaryIds.map(id => artists.get(id)).filter(Boolean);
+    const featuredArtists = trackFeaturedIds.map(id => artists.get(id)).filter(Boolean);
     
-    const mainArtistObj = artists.get(trackPrimaryIds[0]);
+    const trackMainArtists = primaryArtists.map(a => a?.name).join(', ');
+    const trackFeaturedArtists = featuredArtists.map(a => a?.name).join(', ');
+    
+    const spotifyMain = primaryArtists.map(a => a?.spotifyId || '').filter(id => id.trim() !== '').join(', ');
+    const spotifyFeatured = featuredArtists.map(a => a?.spotifyId || '').filter(id => id.trim() !== '').join(', ');
+    
+    const appleMain = primaryArtists.map(a => a?.appleMusicId || '').filter(id => id.trim() !== '').join(', ');
+    const appleFeatured = featuredArtists.map(a => a?.appleMusicId || '').filter(id => id.trim() !== '').join(', ');
+    
+    const instaMain = primaryArtists.map(a => a?.instagramUrl || '').filter(id => id.trim() !== '').join(', ');
+    const instaFeatured = featuredArtists.map(a => a?.instagramUrl || '').filter(id => id.trim() !== '').join(', ');
     
     const mins = Math.floor((track.duration || 0) / 60);
     const secs = (track.duration || 0) % 60;
@@ -91,23 +104,28 @@ const mapReleaseToRows = (release: Release, artists: Map<string, Artist>, labels
       release.filmCast || '',
       track.explicit ? 'Explicit' : 'Clean',
       'No',
-      mainArtistObj?.spotifyId || '',
-      '',
-      mainArtistObj?.appleMusicId || '',
-      '',
-      '',
-      '',
+      spotifyMain,
+      spotifyFeatured,
+      appleMain,
+      appleFeatured,
       '',
       '',
       '',
       '',
-      mainArtistObj?.instagramUrl || ' '
+      '',
+      '',
+      '',
+      instaMain,
+      instaFeatured
     ];
   });
 };
 
-export const getReleaseExcelBuffer = (release: Release, artists: Map<string, Artist>, labels: Map<string, Label>): ArrayBuffer => {
-  if (!window.XLSX) throw new Error('Excel library not loaded');
+export const getReleaseExcelBuffer = async (release: Release, artists: Map<string, Artist>, labels: Map<string, Label>): Promise<ArrayBuffer> => {
+  if (!window.XLSX) {
+      if (window.loadXLSX) await window.loadXLSX();
+      else throw new Error('Excel library not loaded');
+  }
   if (!artists) artists = new Map();
   if (!labels) labels = new Map();
 
@@ -119,10 +137,13 @@ export const getReleaseExcelBuffer = (release: Release, artists: Map<string, Art
   return window.XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
 };
 
-export const exportReleasesToExcel = (releases: Release[], artists: Map<string, Artist>, labels: Map<string, Label>) => {
+export const exportReleasesToExcel = async (releases: Release[], artists: Map<string, Artist>, labels: Map<string, Label>) => {
   if (!window.XLSX) {
-    alert('Excel library not loaded. Please refresh or check connection.');
-    return;
+      if (window.loadXLSX) await window.loadXLSX();
+      else {
+          alert('Excel library not loaded. Please refresh or check connection.');
+          return;
+      }
   }
   
   const safeArtists = artists || new Map();
@@ -137,10 +158,13 @@ export const exportReleasesToExcel = (releases: Release[], artists: Map<string, 
   window.XLSX.writeFile(wb, `Digitalsight_Report_${dateStr}.xlsx`);
 };
 
-export const exportFinancialsToExcel = (revenue: RevenueEntry[], labels: Map<string, Label>, releases: Map<string, Release>, artists: Map<string, Artist>) => {
+export const exportFinancialsToExcel = async (revenue: RevenueEntry[], labels: Map<string, Label>, releases: Map<string, Release>, artists: Map<string, Artist>) => {
   if (!window.XLSX) {
-    alert('Excel library not loaded. Please refresh or check connection.');
-    return;
+      if (window.loadXLSX) await window.loadXLSX();
+      else {
+          alert('Excel library not loaded. Please refresh or check connection.');
+          return;
+      }
   }
 
   const financialHeaders = [

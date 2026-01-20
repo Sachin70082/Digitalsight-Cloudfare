@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { AppContext } from '../App';
 import { api } from '../services/mockApi';
 import { Release, Artist, UserRole, Notice, NoticeType } from '../types';
-import { Card, CardContent, PageLoader, Badge } from '../components/ui';
+import { Card, CardContent, PageLoader, Badge, Skeleton } from '../components/ui';
 import { CreateReleaseIcon, UserGroupIcon, SpotifyIcon, AppleMusicIcon, ArrowUpIcon, ArrowDownIcon } from '../components/Icons';
 
 const NOTICE_STYLING: Record<NoticeType, string> = {
@@ -15,14 +15,14 @@ const NOTICE_STYLING: Record<NoticeType, string> = {
     [NoticeType.EVENT]: 'border-yellow-500/50 bg-yellow-900/10'
 };
 
-const TopStat = ({ title, value, color = "text-white" }: { title: string, value: string | number, color?: string }) => (
+const TopStat = ({ title, value, color = "text-white", loading = false }: { title: string, value: string | number, color?: string, loading?: boolean }) => (
     <div className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 shadow-xl transition-all duration-300 hover:border-primary/20">
         <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mb-2 ml-1">{title}</p>
-        <p className={`text-3xl font-black ${color} tracking-tight`}>{value.toLocaleString()}</p>
+        {loading ? <Skeleton className="h-9 w-24 rounded-lg" /> : <p className={`text-3xl font-black ${color} tracking-tight`}>{value.toLocaleString()}</p>}
     </div>
 );
 
-const NoticesWidget = ({ notices }: { notices: Notice[] }) => (
+const NoticesWidget = ({ notices, loading }: { notices: Notice[], loading: boolean }) => (
     <Card className="h-full">
         <div className="flex justify-between items-center mb-6">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -31,7 +31,16 @@ const NoticesWidget = ({ notices }: { notices: Notice[] }) => (
             </h3>
         </div>
         <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-            {notices.length === 0 ? (
+            {loading ? (
+                [...Array(3)].map((_, i) => (
+                    <div key={i} className="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
+                        <div className="flex justify-between mb-2"><Skeleton className="h-2 w-12" /><Skeleton className="h-2 w-16" /></div>
+                        <Skeleton className="h-4 w-3/4 mb-2" />
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-2/3" />
+                    </div>
+                ))
+            ) : notices.length === 0 ? (
                 <div className="py-10 text-center text-gray-500 text-sm">No active board notices.</div>
             ) : notices.map(notice => (
                 <div key={notice.id} className={`p-4 rounded-xl border-l-4 ${NOTICE_STYLING[notice.type]} transition-transform hover:scale-[1.01] duration-200`}>
@@ -79,8 +88,6 @@ const AdminDashboard: React.FC = () => {
         fetchData();
     }, [user]);
 
-    if (isLoading) return <PageLoader />;
-
     return (
         <div className="space-y-6 animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-gray-800 pb-8">
@@ -101,10 +108,10 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <TopStat title="Network Releases" value={stats.releases} />
-                <TopStat title="Managed Labels" value={stats.labels} color="text-blue-400" />
-                <TopStat title="Global Artists" value={stats.artists} color="text-green-400" />
-                <TopStat title="Pending Review" value={stats.pending} color={stats.pending > 0 ? "text-yellow-500" : "text-gray-500"} />
+                <TopStat title="Network Releases" value={stats.releases} loading={isLoading} />
+                <TopStat title="Managed Labels" value={stats.labels} color="text-blue-400" loading={isLoading} />
+                <TopStat title="Global Artists" value={stats.artists} color="text-green-400" loading={isLoading} />
+                <TopStat title="Pending Review" value={stats.pending} color={stats.pending > 0 ? "text-yellow-500" : "text-gray-500"} loading={isLoading} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -113,7 +120,7 @@ const AdminDashboard: React.FC = () => {
                         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -mr-20 -mt-20 group-hover:bg-primary/10 transition-colors"></div>
                         <CardContent className="pt-6 relative z-10">
                             <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Distribution Engine Status</h2>
-                            <p className="text-gray-400 max-w-lg leading-relaxed text-sm">Monitoring ingest queues and metadata compliance globally across {stats.labels} primary distribution nodes.</p>
+                            <p className="text-gray-400 max-w-lg leading-relaxed text-sm">Monitoring ingest queues and metadata compliance globally across {isLoading ? '...' : stats.labels} primary distribution nodes.</p>
                             
                             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Link to="/correction-queue" className="flex items-center justify-between p-4 bg-gray-900/60 rounded-xl border border-gray-700 hover:border-yellow-500/50 transition-all">
@@ -157,7 +164,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
 
                 <div className="lg:col-span-1">
-                    <NoticesWidget notices={notices} />
+                    <NoticesWidget notices={notices} loading={isLoading} />
                 </div>
             </div>
         </div>
@@ -183,8 +190,6 @@ const PartnerDashboard: React.FC = () => {
         fetchData();
     }, [user]);
 
-    if (isLoading) return <PageLoader />;
-
     return (
         <div className="space-y-6 animate-fade-in">
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -208,7 +213,20 @@ const PartnerDashboard: React.FC = () => {
                             <Link to="/releases" className="text-[10px] text-primary hover:underline font-black uppercase tracking-wider">Full Catalog</Link>
                         </div>
                         <div className="space-y-4">
-                            {releases.length === 0 ? (
+                            {isLoading ? (
+                                [...Array(3)].map((_, i) => (
+                                    <div key={i} className="flex items-center justify-between p-3 bg-gray-900/50 rounded-xl border border-gray-800/50">
+                                        <div className="flex items-center gap-4">
+                                            <Skeleton className="w-10 h-10 rounded" />
+                                            <div className="space-y-1">
+                                                <Skeleton className="h-3 w-32" />
+                                                <Skeleton className="h-2 w-20" />
+                                            </div>
+                                        </div>
+                                        <Skeleton className="h-5 w-16 rounded-full" />
+                                    </div>
+                                ))
+                            ) : releases.length === 0 ? (
                                 <div className="py-12 text-center text-gray-600">No releases in your catalog yet.</div>
                             ) : releases.map(rel => (
                                 <Link to={`/releases/${rel.id}`} key={rel.id} className="flex items-center justify-between p-3 bg-gray-900/50 rounded-xl hover:bg-gray-800 transition-colors border border-gray-800/50">
@@ -235,7 +253,7 @@ const PartnerDashboard: React.FC = () => {
                 </div>
                 
                 <div className="lg:col-span-1">
-                    <NoticesWidget notices={notices} />
+                    <NoticesWidget notices={notices} loading={isLoading} />
                 </div>
             </div>
         </div>

@@ -5,7 +5,7 @@ import { api } from '../services/mockApi';
 import { getReleaseExcelBuffer } from '../services/excelService';
 import { Release, ReleaseStatus, Track, UserRole, Artist, Label, InteractionNote } from '../types';
 import { AppContext } from '../App';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, PageLoader, Textarea, Modal, Spinner } from '../components/ui';
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, PageLoader, Textarea, Modal, Spinner, Input } from '../components/ui';
 import { DownloadIcon, CheckCircleIcon, XCircleIcon, ArrowLeftIcon, MusicIcon } from '../components/Icons';
 
 const MetaItem: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) => (
@@ -112,12 +112,18 @@ const ReleaseReview: React.FC = () => {
     const [isReturnModalOpen, setReturnModalOpen] = useState(false);
     const [isApproveConfirmOpen, setApproveConfirmOpen] = useState(false);
     const [isTakedownConfirmOpen, setTakedownConfirmOpen] = useState(false);
+    const [isRejectModalOpen, setRejectModalOpen] = useState(false);
     const [feedbackNote, setFeedbackNote] = useState('');
 
     // Package Download State
     const [isDownloadingPackage, setIsDownloadingPackage] = useState(false);
     const [packageStatus, setPackageStatus] = useState('');
     const [packagePercentage, setPackagePercentage] = useState(0);
+
+    // Finalize Modal State
+    const [upcInput, setUpcInput] = useState('');
+    const [tracksInput, setTracksInput] = useState<Track[]>([]);
+    const [currentStep, setCurrentStep] = useState(1);
 
     useEffect(() => {
         const isStaff = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
@@ -135,6 +141,8 @@ const ReleaseReview: React.FC = () => {
                         return;
                     }
                     setRelease(releaseData);
+                    setUpcInput(releaseData.upc || '');
+                    setTracksInput(releaseData.tracks || []);
 
                     const artistIds = new Set([
                         ...(releaseData.primaryArtistIds || []),
@@ -183,7 +191,7 @@ const ReleaseReview: React.FC = () => {
                 finalLabelsMap.set(release.labelId, { id: release.labelId, name: 'Unknown Label', ownerId: 'sys' } as Label);
             }
 
-            const excelBuffer = getReleaseExcelBuffer(release, artistsMap, finalLabelsMap);
+            const excelBuffer = await getReleaseExcelBuffer(release, artistsMap, finalLabelsMap);
             const excelBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             const excelUrl = window.URL.createObjectURL(excelBlob);
             
@@ -215,6 +223,54 @@ const ReleaseReview: React.FC = () => {
             console.error("Transmission pipeline failure", error);
             showToast(`Transmission Failure: ${error.message}`, 'error');
             setIsDownloadingPackage(false);
+        }
+    };
+
+    const handleTrackIsrcChange = (trackId: string, newIsrc: string) => {
+        setTracksInput(prev => prev.map(t => 
+            t.id === trackId ? { ...t, isrc: newIsrc } : t
+        ));
+    };
+
+    const handleFinalizePublish = async () => {
+        if (!release || !user) return;
+        
+        if (!upcInput.trim()) {
+            showToast('UPC Code is required.', 'error');
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            const note: InteractionNote = {
+                id: `note-${Date.now()}`,
+                authorName: user.name,
+                authorRole: user.role,
+                message: "Album finalized and published. UPC and ISRCs updated.",
+                timestamp: new Date().toISOString()
+            };
+
+            // Construct the full update payload
+            // We use updateRelease directly to send tracks and UPC along with status
+            // Note: The mockApi.updateReleaseStatus just calls updateRelease with status and notes
+            // So we are doing a superset of that here.
+            const updateData: Partial<Release> = {
+                status: ReleaseStatus.PUBLISHED,
+                upc: upcInput,
+                tracks: tracksInput,
+                notes: [note] as any // Type assertion to match the API expectation if needed, though InteractionNote[] is correct
+            };
+
+            await api.updateRelease(release.id, updateData);
+            
+            showToast(`Release finalized and published successfully.`, 'success');
+            navigate('/releases');
+        } catch (error) {
+            console.error("Finalize failed", error);
+            showToast('Failed to finalize release. Please try again.', 'error');
+        } finally {
+            setIsProcessing(false);
+            setApproveConfirmOpen(false);
         }
     };
     
@@ -250,6 +306,7 @@ const ReleaseReview: React.FC = () => {
             setReturnModalOpen(false);
             setApproveConfirmOpen(false);
             setTakedownConfirmOpen(false);
+            setRejectModalOpen(false);
             setFeedbackNote('');
         }
     };
@@ -326,7 +383,7 @@ const ReleaseReview: React.FC = () => {
                              <div className="grid grid-cols-1 gap-3">
                                 {!isPublished && (
                                     <Button 
-                                        onClick={() => setApproveConfirmOpen(true)} 
+                                        onClick={() => { setCurrentStep(1); setApproveConfirmOpen(true); }} 
                                         disabled={isProcessing}
                                         className="w-full flex items-center justify-center gap-3 py-5 shadow-xl shadow-primary/20 rounded-2xl"
                                     >
@@ -352,7 +409,7 @@ const ReleaseReview: React.FC = () => {
                                 )}
 
                                 <Button 
-                                    onClick={() => handleStatusChange(ReleaseStatus.REJECTED, "Protocol Rejection: Content fails compliance. Audio masters purged from vault.")} 
+                                    onClick={() => { setFeedbackNote(''); setRejectModalOpen(true); }} 
                                     variant="danger" 
                                     disabled={isProcessing || isPublished}
                                     className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl shadow-xl shadow-red-500/10"
@@ -471,27 +528,109 @@ const ReleaseReview: React.FC = () => {
                 </div>
             </Modal>
 
-            <Modal isOpen={isApproveConfirmOpen} onClose={() => setApproveConfirmOpen(false)} title="Authorization Gateway" size="md">
-                <div className="space-y-8 text-center py-4">
-                    <div className="w-20 h-20 bg-primary/20 text-primary rounded-[2rem] flex items-center justify-center mx-auto mb-2 border border-primary/20 shadow-xl shadow-primary/10">
-                        <CheckCircleIcon className="w-10 h-10" />
+            <Modal isOpen={isApproveConfirmOpen} onClose={() => setApproveConfirmOpen(false)} title={currentStep === 1 ? "Finalize: UPC Assignment" : "Finalize: ISRC Verification"} size="lg">
+                {currentStep === 1 && (
+                    <div className="space-y-6">
+                        <div className="p-6 bg-primary/5 border border-primary/20 rounded-[1.5rem]">
+                            <p className="text-sm text-gray-300 font-medium leading-relaxed">
+                                <strong>Step 1/2:</strong> Please assign or verify the Universal Product Code (UPC) for this release. This is required for distribution.
+                            </p>
+                        </div>
+                        <div className="space-y-4">
+                            <Input 
+                                label="Universal Product Code (UPC)" 
+                                placeholder="Enter 12 or 13 digit UPC"
+                                value={upcInput}
+                                onChange={(e) => setUpcInput(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
+                        <div className="flex gap-4 pt-4">
+                            <Button variant="secondary" className="flex-1 rounded-xl text-[10px] font-black uppercase" onClick={() => setApproveConfirmOpen(false)}>Cancel</Button>
+                            <Button 
+                                className="flex-1 rounded-xl text-[10px] font-black uppercase shadow-xl shadow-primary/30" 
+                                disabled={!upcInput.trim()}
+                                onClick={() => setCurrentStep(2)}
+                            >
+                                Next Step &rarr;
+                            </Button>
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="text-2xl font-black text-white uppercase tracking-tight">Authorize Distribution?</h3>
-                        <p className="text-sm text-gray-400 mt-3 leading-relaxed">
-                            Finalizing this node will synchronize it with the <span className="text-primary font-bold">Published</span> archive. Assets will be prepared for immediate DSP delivery.
+                )}
+
+                {currentStep === 2 && (
+                    <div className="space-y-6">
+                        <div className="p-6 bg-primary/5 border border-primary/20 rounded-[1.5rem]">
+                            <p className="text-sm text-gray-300 font-medium leading-relaxed">
+                                <strong>Step 2/2:</strong> Verify ISRC codes for all tracks. If codes were provided during ingestion, they are pre-filled below.
+                            </p>
+                        </div>
+                        
+                        <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                            {tracksInput.map((track) => (
+                                <div key={track.id} className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
+                                    <div className="w-8 h-8 bg-black/40 rounded-lg flex items-center justify-center text-xs font-bold text-gray-500">
+                                        {track.trackNumber}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold text-white truncate">{track.title}</p>
+                                        <p className="text-[10px] text-gray-500 truncate">{track.audioFileName}</p>
+                                    </div>
+                                    <div className="w-48">
+                                        <Input 
+                                            placeholder="ISRC Code"
+                                            value={track.isrc || ''}
+                                            onChange={(e) => handleTrackIsrcChange(track.id, e.target.value)}
+                                            className="py-2 text-xs font-mono tracking-wider"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="flex gap-4 pt-4">
+                            <Button variant="secondary" className="flex-1 rounded-xl text-[10px] font-black uppercase" onClick={() => setCurrentStep(1)}>&larr; Back</Button>
+                            <Button 
+                                className="flex-1 rounded-xl text-[10px] font-black uppercase shadow-xl shadow-primary/30" 
+                                disabled={isProcessing}
+                                onClick={handleFinalizePublish}
+                            >
+                                {isProcessing ? <Spinner className="w-5 h-5" /> : 'Finalize & Publish'}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            <Modal isOpen={isRejectModalOpen} onClose={() => setRejectModalOpen(false)} title="Rejection Protocol" size="lg">
+                <div className="space-y-6">
+                    <div className="p-6 bg-red-900/20 border border-red-500/30 rounded-[1.5rem]">
+                        <p className="text-sm text-red-400 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
+                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                             Content Rejection
+                        </p>
+                        <p className="text-sm text-gray-300 font-medium leading-relaxed">
+                            Rejection will purge audio masters from the vault. Metadata will be preserved for audit. The label will be notified.
                         </p>
                     </div>
+                    <div className="space-y-3">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Reason for Rejection</label>
+                        <Textarea 
+                            placeholder="Specify compliance failure (e.g. Low audio quality, Incorrect metadata, Copyright violation)"
+                            value={feedbackNote}
+                            onChange={(e) => setFeedbackNote(e.target.value)}
+                            rows={4}
+                            autoFocus
+                        />
+                    </div>
                     <div className="flex gap-4 pt-4">
-                        <Button variant="secondary" className="flex-1 rounded-xl text-[10px] font-black uppercase" onClick={() => setApproveConfirmOpen(false)} disabled={isProcessing}>
-                            Continue Audit
-                        </Button>
+                        <Button variant="secondary" className="flex-1 rounded-xl text-[10px] font-black uppercase" onClick={() => setRejectModalOpen(false)}>Cancel</Button>
                         <Button 
-                            className="flex-1 rounded-xl text-[10px] font-black uppercase shadow-xl shadow-primary/30" 
-                            disabled={isProcessing}
-                            onClick={() => handleStatusChange(ReleaseStatus.PUBLISHED, "Album published.")}
+                            className="flex-1 bg-red-600 hover:bg-red-500 border-none rounded-xl text-[10px] font-black uppercase shadow-xl shadow-red-600/20" 
+                            disabled={!feedbackNote.trim() || isProcessing}
+                            onClick={() => handleStatusChange(ReleaseStatus.REJECTED, `Rejection: ${feedbackNote}`)}
                         >
-                            {isProcessing ? <Spinner className="w-5 h-5" /> : 'Authorize Ingest'}
+                            {isProcessing ? <Spinner className="w-5 h-5" /> : 'Confirm Rejection'}
                         </Button>
                     </div>
                 </div>
