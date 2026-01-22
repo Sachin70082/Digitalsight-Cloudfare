@@ -697,30 +697,25 @@ async function handleReleases(request: Request, env: Env, corsHeaders: any, curr
 
         const batch = [];
 
-        // Logic to find the real R2 folder name (draft-xxxx) from existing URLs
-        let r2FolderName = id; 
-        const urlToParse = data.artworkUrl || current.artwork_url;
-        if (urlToParse) {
-            const parts = urlToParse.split('/');
-            const relIdx = parts.indexOf('releases');
-            if (relIdx !== -1 && parts[relIdx + 1]) r2FolderName = parts[relIdx + 1];
-        }
-
-        // Handle Audio Purge for Takedown/Rejected
+        // Handle Asset Purge for Takedown/Rejected
         if (data.status === 'Rejected' || data.status === 'Takedown') {
             if (env.BUCKET) {
                 try {
-                    const audioPrefix = `releases/${r2FolderName}/audio/`;
-                    const list = await env.BUCKET.list({ prefix: audioPrefix });
-                    if (list.objects.length > 0) {
-                        await env.BUCKET.delete(list.objects.map(o => o.key));
-                        console.log(`✅ Purged audio from: ${audioPrefix}`);
-                    }
+                    // Fetch tracks to get a better folder name if needed
+                    const { results: tracks } = await env.DB.prepare('SELECT audio_url FROM tracks WHERE release_id = ?').bind(id).all();
+                    const folderName = extractFolderName(id, current.artwork_url, tracks);
+                    
+                    // Purge both audio and artwork
+                    await deleteR2Folder(env.BUCKET, `releases/${folderName}/audio/`);
+                    await deleteR2Folder(env.BUCKET, `releases/${folderName}/artwork/`);
+                    
+                    console.log(`✅ Purged assets from: releases/${folderName}/`);
                 } catch (e: any) {
-                    console.error("Audio purge failed:", e.message);
+                    console.error("Asset purge failed:", e.message);
                 }
             }
-            batch.push(env.DB.prepare('UPDATE tracks SET audio_url = NULL WHERE release_id = ?').bind(id));
+            batch.push(env.DB.prepare('UPDATE tracks SET audio_url = NULL, audio_file_name = NULL WHERE release_id = ?').bind(id));
+            batch.push(env.DB.prepare('UPDATE releases SET artwork_url = NULL, artwork_file_name = NULL WHERE id = ?').bind(id));
         }
 
         // Update Metadata
@@ -896,20 +891,13 @@ async function handleReleases(request: Request, env: Env, corsHeaders: any, curr
         if (isStaff || (isDeletableStatus && (isOwnerLabel || isParentLabel))) {
             if (env.BUCKET) {
                 try {
-                    // Extract the "draft-xxxx" folder name from the URL
-                    let folderName = id; 
-                    if (release.artwork_url) {
-                        const parts = release.artwork_url.split('/');
-                        const relIdx = parts.indexOf('releases');
-                        if (relIdx !== -1 && parts[relIdx + 1]) folderName = parts[relIdx + 1];
-                    }
+                    // Fetch tracks to get a better folder name if needed
+                    const { results: tracks } = await env.DB.prepare('SELECT audio_url FROM tracks WHERE release_id = ?').bind(id).all();
+                    const folderName = extractFolderName(id, release.artwork_url, tracks);
 
                     const prefix = `releases/${folderName}/`;
-                    const list = await env.BUCKET.list({ prefix });
-                    if (list.objects.length > 0) {
-                        await env.BUCKET.delete(list.objects.map(o => o.key));
-                        console.log(`✅ Deleted R2 folder: ${prefix}`);
-                    }
+                    await deleteR2Folder(env.BUCKET, prefix);
+                    console.log(`✅ Deleted R2 folder: ${prefix}`);
                 } catch (e: any) {
                     console.error("R2 deletion failed:", e.message);
                 }
@@ -1269,4 +1257,33 @@ async function verifyJwt(token: string, secret: string) {
   if (!isValid) throw new Error('Invalid signature');
   
   return JSON.parse(atob(encodedPayload));
+}
+
+/**
+ * Recursively deletes all objects under a prefix in R2.
+ */
+async function deleteR2Folder(bucket: R2Bucket, prefix: string) {
+    let truncated = true;
+    let cursor: string | undefined;
+    while (truncated) {
+        const list = await bucket.list({ prefix, cursor });
+        if (list.objects.length > 0) {
+            await bucket.delete(list.objects.map(o => o.key));
+        }
+        truncated = list.truncated;
+        cursor = list.truncated ? list.cursor : undefined;
+    }
+}
+
+/**
+ * Extracts the R2 folder name (e.g. draft-xxxx or UUID) from URLs.
+ */
+function extractFolderName(id: string, artworkUrl?: string, tracks?: any[]) {
+    const urls = [artworkUrl, ...(tracks || []).map(t => t.audio_url)].filter(Boolean);
+    for (const url of urls) {
+        const parts = url.split('/');
+        const relIdx = parts.indexOf('releases');
+        if (relIdx !== -1 && parts[relIdx + 1]) return parts[relIdx + 1];
+    }
+    return id;
 }
