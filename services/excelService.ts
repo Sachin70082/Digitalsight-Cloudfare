@@ -47,14 +47,14 @@ const mapReleaseToRows = (release: Release, artists: Map<string, Artist>, labels
     const trackMainArtists = primaryArtists.map(a => a?.name).join(', ');
     const trackFeaturedArtists = featuredArtists.map(a => a?.name).join(', ');
     
-    const spotifyMain = primaryArtists.map(a => a?.spotifyId || '').filter(id => id.trim() !== '').join(', ');
-    const spotifyFeatured = featuredArtists.map(a => a?.spotifyId || '').filter(id => id.trim() !== '').join(', ');
+    const spotifyMain = primaryArtists.map(a => a?.spotifyId || '').filter(id => id.trim() !== '').map(id => id.startsWith('http') ? id : `https://open.spotify.com/artist/${id}`).join(', ');
+    const spotifyFeatured = featuredArtists.map(a => a?.spotifyId || '').filter(id => id.trim() !== '').map(id => id.startsWith('http') ? id : `https://open.spotify.com/artist/${id}`).join(', ');
     
-    const appleMain = primaryArtists.map(a => a?.appleMusicId || '').filter(id => id.trim() !== '').join(', ');
-    const appleFeatured = featuredArtists.map(a => a?.appleMusicId || '').filter(id => id.trim() !== '').join(', ');
+    const appleMain = primaryArtists.map(a => a?.appleMusicId || '').filter(id => id.trim() !== '').map(id => id.startsWith('http') ? id : `https://music.apple.com/artist/${id}`).join(', ');
+    const appleFeatured = featuredArtists.map(a => a?.appleMusicId || '').filter(id => id.trim() !== '').map(id => id.startsWith('http') ? id : `https://music.apple.com/artist/${id}`).join(', ');
     
-    const instaMain = primaryArtists.map(a => a?.instagramUrl || '').filter(id => id.trim() !== '').join(', ');
-    const instaFeatured = featuredArtists.map(a => a?.instagramUrl || '').filter(id => id.trim() !== '').join(', ');
+    const instaMain = primaryArtists.map(a => a?.instagramUrl || '').filter(id => id.trim() !== '').map(url => url.startsWith('http') ? url : `https://instagram.com/${url}`).join(', ');
+    const instaFeatured = featuredArtists.map(a => a?.instagramUrl || '').filter(id => id.trim() !== '').map(url => url.startsWith('http') ? url : `https://instagram.com/${url}`).join(', ');
     
     const mins = Math.floor((track.duration || 0) / 60);
     const secs = (track.duration || 0) % 60;

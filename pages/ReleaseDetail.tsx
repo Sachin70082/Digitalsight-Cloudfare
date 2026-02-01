@@ -210,7 +210,7 @@ const ReleaseDetail: React.FC = () => {
     if (!release) return <div className="text-center p-20 text-red-500 font-black uppercase tracking-widest animate-fade-in">Session not found in distribution archive.</div>;
 
     return (
-        <div className="space-y-8 animate-fade-in w-full pb-20">
+        <div className="space-y-8 animate-fade-in w-full pb-20 max-w-none">
             <div className="flex flex-col md:flex-row justify-between items-start gap-6 border-b border-gray-800 pb-8 px-4">
                 <div className="flex items-center gap-6">
                     <button 
@@ -221,9 +221,39 @@ const ReleaseDetail: React.FC = () => {
                     </button>
                     <div>
                         <h1 className="text-4xl font-black text-white tracking-tighter uppercase">{release.title}</h1>
-                        <p className="text-gray-500 font-bold uppercase tracking-widest mt-1">
-                            Primary Artist: <span className="text-primary font-black">{artist?.name || 'Unknown'}</span>
-                        </p>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-1">
+                            <p className="text-gray-500 font-bold uppercase tracking-widest">
+                                Primary Artists: <span className="text-primary font-black">{(release.primaryArtistIds || []).map(id => allArtists.get(id)?.name).filter(Boolean).join(', ') || 'Unknown'}</span>
+                            </p>
+                            <div className="flex flex-wrap items-center gap-4 border-l border-gray-800 pl-4">
+                                {[...(release.primaryArtistIds || []), ...(release.featuredArtistIds || [])].map(id => {
+                                    const a = allArtists.get(id);
+                                    if (!a || (!a.spotifyId && !a.appleMusicId && !a.instagramUrl)) return null;
+                                    return (
+                                        <div key={a.id} className="flex items-center gap-2 bg-white/5 px-2 py-1 rounded-lg border border-white/5">
+                                            <span className="text-[9px] font-black text-gray-400 uppercase truncate max-w-[80px]">{a.name}</span>
+                                            <div className="flex items-center gap-1.5">
+                                                {a.spotifyId && (
+                                                    <a href={`https://open.spotify.com/artist/${a.spotifyId}`} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#1DB954] transition-colors" title={`${a.name} Spotify`}>
+                                                        <SpotifyIcon className="w-3 h-3" />
+                                                    </a>
+                                                )}
+                                                {a.appleMusicId && (
+                                                    <a href={`https://music.apple.com/artist/${a.appleMusicId}`} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#FA243C] transition-colors" title={`${a.name} Apple Music`}>
+                                                        <AppleMusicIcon className="w-3 h-3" />
+                                                    </a>
+                                                )}
+                                                {a.instagramUrl && (
+                                                    <a href={a.instagramUrl.startsWith('http') ? a.instagramUrl : `https://instagram.com/${a.instagramUrl}`} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#E4405F] transition-colors" title={`${a.name} Instagram`}>
+                                                        <InstagramIcon className="w-3 h-3" />
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -324,9 +354,39 @@ const ReleaseDetail: React.FC = () => {
                                                             {track.title}
                                                             {track.explicit && <span className="text-[10px] bg-red-600/20 text-red-500 border border-red-600/30 px-2 py-0.5 rounded font-black ml-3 align-middle tracking-widest uppercase">Explicit</span>}
                                                         </h3>
-                                                        <p className="text-sm text-gray-500 font-bold uppercase tracking-widest mt-1">
-                                                            {primaryArtists} {featuredArtists ? `(feat. ${featuredArtists})` : ''}
-                                                        </p>
+                                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                                                            <p className="text-sm text-gray-500 font-bold uppercase tracking-widest">
+                                                                {primaryArtists} {featuredArtists ? `(feat. ${featuredArtists})` : ''}
+                                                            </p>
+                                                            <div className="flex flex-wrap items-center gap-2 border-l border-gray-800 pl-3">
+                                                                {[...(track.primaryArtistIds || []), ...(track.featuredArtistIds || [])].map(id => {
+                                                                    const a = allArtists.get(id);
+                                                                    if (!a || (!a.spotifyId && !a.appleMusicId && !a.instagramUrl)) return null;
+                                                                    return (
+                                                                        <div key={a.id} className="flex items-center gap-1.5 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                                                                            <span className="text-[8px] font-black text-gray-500 uppercase truncate max-w-[60px]">{a.name}</span>
+                                                                            <div className="flex items-center gap-1">
+                                                                                {a.spotifyId && (
+                                                                                    <a href={`https://open.spotify.com/artist/${a.spotifyId}`} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#1DB954] transition-colors" title={`${a.name} Spotify`}>
+                                                                                        <SpotifyIcon className="w-2.5 h-2.5" />
+                                                                                    </a>
+                                                                                )}
+                                                                                {a.appleMusicId && (
+                                                                                    <a href={`https://music.apple.com/artist/${a.appleMusicId}`} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#FA243C] transition-colors" title={`${a.name} Apple Music`}>
+                                                                                        <AppleMusicIcon className="w-2.5 h-2.5" />
+                                                                                    </a>
+                                                                                )}
+                                                                                {a.instagramUrl && (
+                                                                                    <a href={a.instagramUrl.startsWith('http') ? a.instagramUrl : `https://instagram.com/${a.instagramUrl}`} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#E4405F] transition-colors" title={`${a.name} Instagram`}>
+                                                                                        <InstagramIcon className="w-2.5 h-2.5" />
+                                                                                    </a>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
