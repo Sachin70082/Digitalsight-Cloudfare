@@ -956,17 +956,28 @@ async function handleRevenue(request: Request, env: Env, corsHeaders: any) {
 async function handleSearch(request: Request, env: Env, corsHeaders: any) {
     const url = new URL(request.url);
     const query = url.searchParams.get('q') || '';
+    const searchPattern = `%${query}%`;
     
-    const { results: users } = await env.DB.prepare('SELECT * FROM users WHERE name LIKE ? OR email LIKE ?').bind(`%${query}%`, `%${query}%`).all();
-    const { results: releases } = await env.DB.prepare('SELECT * FROM releases WHERE title LIKE ?').bind(`%${query}%`).all();
-    const { results: artists } = await env.DB.prepare('SELECT * FROM artists WHERE name LIKE ?').bind(`%${query}%`).all();
-    const { results: labels } = await env.DB.prepare('SELECT * FROM labels WHERE name LIKE ?').bind(`%${query}%`).all();
+    const { results: users } = await env.DB.prepare('SELECT * FROM users WHERE name LIKE ? OR email LIKE ?').bind(searchPattern, searchPattern).all();
+    
+    // Enhanced release search to include UPC and ISRC
+    const { results: releases } = await env.DB.prepare(`
+        SELECT DISTINCT r.* 
+        FROM releases r
+        LEFT JOIN tracks t ON r.id = t.release_id
+        WHERE r.title LIKE ? 
+        OR r.upc LIKE ? 
+        OR t.isrc LIKE ?
+    `).bind(searchPattern, searchPattern, searchPattern).all();
+    
+    const { results: artists } = await env.DB.prepare('SELECT * FROM artists WHERE name LIKE ?').bind(searchPattern).all();
+    const { results: labels } = await env.DB.prepare('SELECT * FROM labels WHERE name LIKE ?').bind(searchPattern).all();
 
     return new Response(JSON.stringify({
-        users,
-        releases,
-        artists,
-        labels
+        users: (users || []).map(mapUser),
+        releases: (releases || []).map(mapRelease),
+        artists: (artists || []).map(mapArtist),
+        labels: (labels || []).map(mapLabel)
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
