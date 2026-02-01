@@ -220,8 +220,10 @@ const Layout: React.FC = () => {
                         </div>
                     </div>
                 </header>
-                <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
-                    <Outlet />
+                <div className="flex-1 p-0 overflow-y-auto custom-scrollbar">
+                    <div className="p-6">
+                        <Outlet />
+                    </div>
                 </div>
             </main>
         </div>

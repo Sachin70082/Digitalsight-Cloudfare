@@ -6,7 +6,7 @@ import { getReleaseExcelBuffer } from '../services/excelService';
 import { Release, ReleaseStatus, Track, UserRole, Artist, Label, InteractionNote } from '../types';
 import { AppContext } from '../App';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, PageLoader, Textarea, Modal, Spinner, Input } from '../components/ui';
-import { DownloadIcon, CheckCircleIcon, XCircleIcon, ArrowLeftIcon, MusicIcon } from '../components/Icons';
+import { DownloadIcon, CheckCircleIcon, XCircleIcon, ArrowLeftIcon, MusicIcon, SpotifyIcon, AppleMusicIcon, InstagramIcon } from '../components/Icons';
 
 const MetaItem: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) => (
     <div>
@@ -318,7 +318,7 @@ const ReleaseReview: React.FC = () => {
     const primaryArtist = release.primaryArtistIds?.[0] ? (artistsMap.get(release.primaryArtistIds[0])?.name || 'Unknown Artist') : 'Unknown Artist';
 
     return (
-        <div className="space-y-8 animate-fade-in pb-20 max-w-7xl mx-auto">
+        <div className="space-y-8 animate-fade-in pb-20 w-full max-w-none">
             {isDownloadingPackage && (
                 <PackageCircularProgress percentage={packagePercentage} status={packageStatus} />
             )}
@@ -330,9 +330,39 @@ const ReleaseReview: React.FC = () => {
                     </button>
                     <div>
                         <h1 className="text-4xl font-black text-white tracking-tighter uppercase">{release.title}</h1>
-                        <p className="text-gray-500 font-bold uppercase tracking-widest mt-1">
-                            by <span className="text-primary font-black">{primaryArtist}</span> • {label?.name || 'Unknown Label'}
-                        </p>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-1">
+                            <p className="text-gray-500 font-bold uppercase tracking-widest">
+                                by <span className="text-primary font-black">{(release.primaryArtistIds || []).map(id => artistsMap.get(id)?.name).filter(Boolean).join(', ') || 'Unknown'}</span> • {label?.name || 'Unknown Label'}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-4 border-l border-gray-800 pl-4">
+                                {[...(release.primaryArtistIds || []), ...(release.featuredArtistIds || [])].map(id => {
+                                    const a = artistsMap.get(id);
+                                    if (!a || (!a.spotifyId && !a.appleMusicId && !a.instagramUrl)) return null;
+                                    return (
+                                        <div key={a.id} className="flex items-center gap-2 bg-white/5 px-2 py-1 rounded-lg border border-white/5">
+                                            <span className="text-[9px] font-black text-gray-400 uppercase truncate max-w-[80px]">{a.name}</span>
+                                            <div className="flex items-center gap-1.5">
+                                                {a.spotifyId && (
+                                                    <a href={`https://open.spotify.com/artist/${a.spotifyId}`} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#1DB954] transition-colors" title={`${a.name} Spotify`}>
+                                                        <SpotifyIcon className="w-3 h-3" /> 
+                                                    </a>
+                                                )}
+                                                {a.appleMusicId && (
+                                                    <a href={`https://music.apple.com/artist/${a.appleMusicId}`} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#FA243C] transition-colors" title={`${a.name} Apple Music`}>
+                                                        <AppleMusicIcon className="w-3 h-3" />
+                                                    </a>
+                                                )}
+                                                {a.instagramUrl && (
+                                                    <a href={a.instagramUrl.startsWith('http') ? a.instagramUrl : `https://instagram.com/${a.instagramUrl}`} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#E4405F] transition-colors" title={`${a.name} Instagram`}>
+                                                        <InstagramIcon className="w-3 h-3" />
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -478,7 +508,37 @@ const ReleaseReview: React.FC = () => {
                                                         {track.title} 
                                                         {track.explicit && <span className="text-[10px] bg-red-600/20 text-red-500 border border-red-600/30 px-3 py-1 rounded-full font-black ml-4 align-middle tracking-[0.2em] uppercase">Explicit</span>}
                                                     </p>
-                                                    <p className="text-[11px] text-gray-500 font-mono tracking-tighter mt-1">ISRC: <span className="text-gray-300 font-bold tracking-widest">{track.isrc}</span> • PCM WAV 44.1kHz • {Math.floor(track.duration/60)}:{String(track.duration%60).padStart(2,'0')}</p>
+                                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                                                        <p className="text-[11px] text-gray-500 font-mono tracking-tighter">ISRC: <span className="text-gray-300 font-bold tracking-widest">{track.isrc}</span> • PCM WAV 44.1kHz • {Math.floor(track.duration/60)}:{String(track.duration%60).padStart(2,'0')}</p>
+                                                        <div className="flex flex-wrap items-center gap-2 border-l border-gray-800 pl-3">
+                                                            {[...(track.primaryArtistIds || []), ...(track.featuredArtistIds || [])].map(id => {
+                                                                const a = artistsMap.get(id);
+                                                                if (!a || (!a.spotifyId && !a.appleMusicId && !a.instagramUrl)) return null;
+                                                                return (
+                                                                    <div key={a.id} className="flex items-center gap-1.5 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                                                                        <span className="text-[8px] font-black text-gray-500 uppercase truncate max-w-[60px]">{a.name}</span>
+                                                                        <div className="flex items-center gap-1">
+                                                                            {a.spotifyId && (
+                                                                                <a href={`https://open.spotify.com/artist/${a.spotifyId}`} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#1DB954] transition-colors" title={`${a.name} Spotify`}>
+                                                                                    <SpotifyIcon className="w-2.5 h-2.5" />
+                                                                                </a>
+                                                                            )}
+                                                                            {a.appleMusicId && (
+                                                                                <a href={`https://music.apple.com/artist/${a.appleMusicId}`} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#FA243C] transition-colors" title={`${a.name} Apple Music`}>
+                                                                                    <AppleMusicIcon className="w-2.5 h-2.5" />
+                                                                                </a>
+                                                                            )}
+                                                                            {a.instagramUrl && (
+                                                                                <a href={a.instagramUrl.startsWith('http') ? a.instagramUrl : `https://instagram.com/${a.instagramUrl}`} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#E4405F] transition-colors" title={`${a.name} Instagram`}>
+                                                                                    <InstagramIcon className="w-2.5 h-2.5" />
+                                                                                </a>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="bg-black/60 p-4 rounded-2xl border border-white/5 flex-grow md:max-w-md">
