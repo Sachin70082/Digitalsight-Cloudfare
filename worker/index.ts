@@ -842,9 +842,28 @@ async function handleReleases(request: Request, env: Env, corsHeaders: any, curr
             const { results: tracks } = await env.DB.prepare('SELECT * FROM tracks WHERE release_id = ?').bind(id).all();
             const { results: notes } = await env.DB.prepare('SELECT * FROM interaction_notes WHERE release_id = ? ORDER BY timestamp DESC').bind(id).all();
             
+            // Fetch all associated artists
+            const artistIds = new Set([
+                ...JSON.parse(release.primary_artist_ids || '[]'),
+                ...JSON.parse(release.featured_artist_ids || '[]'),
+                ...tracks.flatMap((t: any) => [
+                    ...JSON.parse(t.primary_artist_ids || '[]'),
+                    ...JSON.parse(t.featured_artist_ids || '[]')
+                ])
+            ]);
+
+            const artists: any[] = [];
+            if (artistIds.size > 0) {
+                const ids = Array.from(artistIds);
+                const placeholders = ids.map(() => '?').join(',');
+                const { results } = await env.DB.prepare(`SELECT * FROM artists WHERE id IN (${placeholders})`).bind(...ids).all();
+                artists.push(...results);
+            }
+
             const mapped = mapRelease(release) as any;
             mapped.tracks = tracks.map(mapTrack);
             mapped.notes = notes.map(mapNote);
+            mapped.artists = artists.map(mapArtist);
             
             return new Response(JSON.stringify(mapped), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }

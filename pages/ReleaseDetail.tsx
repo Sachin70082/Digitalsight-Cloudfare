@@ -62,7 +62,36 @@ const PmaReleaseDetailView: React.FC<{
                                 </PmaTR>
                                 <PmaTR>
                                     <PmaTD isLabel>Primary Artists</PmaTD>
-                                    <PmaTD className="text-black">{(release.primaryArtistIds || []).map(id => allArtists.get(id)?.name).filter(Boolean).join(', ') || 'Unknown'}</PmaTD>
+                                    <PmaTD className="text-black">
+                                        <div className="space-y-1">
+                                            {(release.primaryArtistIds || []).map(id => {
+                                                const a = allArtists.get(id);
+                                                if (!a) return null;
+                                                return (
+                                                    <div key={a.id} className="flex items-center gap-2">
+                                                        <span className="font-bold">{a.name}</span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            {a.spotifyId && (
+                                                                <a href={`https://open.spotify.com/artist/${a.spotifyId}`} target="_blank" rel="noopener noreferrer" className="text-[#1DB954] hover:underline text-[9px] flex items-center gap-0.5">
+                                                                    <SpotifyIcon className="w-3 h-3" /> {a.spotifyId}
+                                                                </a>
+                                                            )}
+                                                            {a.appleMusicId && (
+                                                                <a href={`https://music.apple.com/artist/${a.appleMusicId}`} target="_blank" rel="noopener noreferrer" className="text-[#FA243C] hover:underline text-[9px] flex items-center gap-0.5">
+                                                                    <AppleMusicIcon className="w-3 h-3" /> {a.appleMusicId}
+                                                                </a>
+                                                            )}
+                                                            {a.instagramUrl && (
+                                                                <a href={a.instagramUrl.startsWith('http') ? a.instagramUrl : `https://instagram.com/${a.instagramUrl}`} target="_blank" rel="noopener noreferrer" className="text-[#E4405F] hover:underline text-[9px] flex items-center gap-0.5">
+                                                                    <InstagramIcon className="w-3 h-3" /> {a.instagramUrl}
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </PmaTD>
                                 </PmaTR>
                                 <PmaTR>
                                     <PmaTD isLabel>Status</PmaTD>
@@ -621,14 +650,19 @@ const ReleaseDetail: React.FC = () => {
                 setRelease(releaseData);
                 setIsLoading(false);
 
-                const [fetchedArtists, labelData] = await Promise.all([
-                    api.getAllArtists(),
+                const artistMap = new Map<string, Artist>();
+                if (releaseData.artists) {
+                    releaseData.artists.forEach(a => artistMap.set(a.id, a));
+                } else {
+                    // Fallback
+                    const fetchedArtists = await api.getAllArtists();
+                    fetchedArtists.forEach(a => artistMap.set(a.id, a));
+                }
+                setAllArtists(artistMap);
+
+                const [labelData] = await Promise.all([
                     releaseData.labelId ? api.getLabel(releaseData.labelId) : Promise.resolve(null)
                 ]);
-
-                const artistMap = new Map<string, Artist>();
-                fetchedArtists.forEach(a => artistMap.set(a.id, a));
-                setAllArtists(artistMap);
 
                 const primaryIds = releaseData.primaryArtistIds || [];
                 if (primaryIds.length > 0) {
