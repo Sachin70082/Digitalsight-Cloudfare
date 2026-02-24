@@ -1,5 +1,6 @@
-import React from 'react';
-import { Artist } from '../types';
+import React, { useContext } from 'react';
+import { Artist, UserRole } from '../types';
+import { AppContext } from '../App';
 
 interface ArtistSelectorProps {
   label: string;
@@ -16,6 +17,8 @@ const ArtistSelector: React.FC<ArtistSelectorProps> = ({
   onChange,
   disabledArtistIds = []
 }) => {
+  const { user } = useContext(AppContext);
+  const isPlatformSide = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
 
   const handleAddArtist = (artistId: string) => {
     if (artistId && !selectedArtistIds.includes(artistId)) {
@@ -29,6 +32,42 @@ const ArtistSelector: React.FC<ArtistSelectorProps> = ({
 
   const selectedArtists = selectedArtistIds.map(id => allArtists.find(a => a.id === id)).filter(Boolean) as Artist[];
   const availableArtists = allArtists.filter(a => !selectedArtistIds.includes(a.id) && !disabledArtistIds.includes(a.id));
+
+  if (isPlatformSide) {
+    return (
+      <div className="space-y-1" style={{ fontFamily: 'Verdana, Arial, Helvetica, sans-serif' }}>
+        <label className="block text-[10px] font-bold text-[#666]">{label}</label>
+        <div className="border border-[#aaa] p-1 bg-white min-h-[30px] shadow-sm">
+          {selectedArtists.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-1">
+              {selectedArtists.map(artist => (
+                <span key={artist.id} className="bg-[#f5f5f5] border border-[#aaa] text-[#333] text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                  {artist.name}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveArtist(artist.id)}
+                    className="text-[#cc0000] font-bold hover:bg-[#eee] px-0.5"
+                  >
+                    &times;
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <select
+            value=""
+            onChange={(e) => handleAddArtist(e.target.value)}
+            className="w-full bg-transparent border-none text-[10px] font-bold outline-none cursor-pointer text-[#0066cc]"
+          >
+            <option value="">{selectedArtists.length > 0 ? 'Add another...' : 'Select artist...'}</option>
+            {availableArtists.map(artist => (
+              <option key={artist.id} value={artist.id}>{artist.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">

@@ -158,6 +158,33 @@ export const exportReleasesToExcel = async (releases: Release[], artists: Map<st
   window.XLSX.writeFile(wb, `Digitalsight_Report_${dateStr}.xlsx`);
 };
 
+export const exportReleasesToCSV = async (releases: Release[], artists: Map<string, Artist>, labels: Map<string, Label>) => {
+  const safeArtists = artists || new Map();
+  const safeLabels = labels || new Map();
+
+  const allRows = (releases || []).flatMap(rel => mapReleaseToRows(rel, safeArtists, safeLabels));
+  
+  const csvContent = [
+      EXCEL_HEADERS.map(h => `"${h.replace(/"/g, '""')}"`).join(','),
+      ...allRows.map(row => row.map(cell => {
+          const str = String(cell ?? '');
+          // Escape quotes and wrap in quotes
+          return `"${str.replace(/"/g, '""')}"`;
+      }).join(','))
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  const dateStr = new Date().toISOString().slice(0,10);
+  link.setAttribute("href", url);
+  link.setAttribute("download", `Digitalsight_Report_${dateStr}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 export const exportFinancialsToExcel = async (revenue: RevenueEntry[], labels: Map<string, Label>, releases: Map<string, Release>, artists: Map<string, Artist>) => {
   if (!window.XLSX) {
       if (window.loadXLSX) await window.loadXLSX();

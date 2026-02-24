@@ -35,6 +35,11 @@ const SubLabels: React.FC = () => {
     const [isBlocking, setIsBlocking] = useState(false);
     const [blockedStatus, setBlockedStatus] = useState<Record<string, boolean>>({});
 
+    // Deletion State
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [labelToDelete, setLabelToDelete] = useState<Label | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
     const fetchSubLabels = async () => {
         if (user?.labelId) {
             setIsLoading(true);
@@ -126,11 +131,24 @@ const SubLabels: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleDelete = async (label: Label) => {
-        if (window.confirm(`Are you sure you want to terminate "${label.name}"? Vault access will be revoked.`)) {
-            setIsLoading(true);
-            await api.deleteLabel(label.id, user as User);
+    const handleOpenDelete = (label: Label) => {
+        setLabelToDelete(label);
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!user || !labelToDelete) return;
+        setIsDeleting(true);
+        try {
+            await api.deleteLabel(labelToDelete.id, user as User);
+            showToast(`Node "${labelToDelete.name}" successfully terminated.`, 'success');
+            setIsDeleteModalOpen(false);
+            setLabelToDelete(null);
             await fetchSubLabels();
+        } catch (err: any) {
+            showToast(err.message || 'Node termination failed.', 'error');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -221,7 +239,7 @@ const SubLabels: React.FC = () => {
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                                     </button>
-                                    <button onClick={() => handleDelete(label)} className="text-gray-600 hover:text-red-500 transition-colors p-2 bg-white/5 rounded-xl">
+                                    <button onClick={() => handleOpenDelete(label)} className="text-gray-600 hover:text-red-500 transition-colors p-2 bg-white/5 rounded-xl">
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                     </button>
                                 </div>
@@ -246,6 +264,56 @@ const SubLabels: React.FC = () => {
             </div>
 
             <Pagination totalItems={subLabels.length} itemsPerPage={itemsPerPage} currentPage={currentPage} onPageChange={setCurrentPage} />
+
+            {/* Deletion Confirmation Modal */}
+            <Modal
+                isOpen={isDeleteModalOpen}
+                onClose={() => !isDeleting && setIsDeleteModalOpen(false)} 
+                title="Node Termination Protocol" 
+                size="md"
+            >
+                <div className="space-y-6 text-center py-4">
+                    <div className="w-20 h-20 bg-red-900/20 text-red-500 rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 border border-red-500/20 animate-pulse">
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <h3 className="text-2xl font-black text-white uppercase tracking-tight">Confirm Hard Deletion</h3>
+                        <p className="text-gray-500 font-medium leading-relaxed">
+                            You are about to PERMANENTLY terminate distribution node <span className="text-white font-bold">"{labelToDelete?.name}"</span>. 
+                        </p>
+                    </div>
+
+                    <div className="bg-black/40 p-6 rounded-2xl border border-white/5 text-left space-y-4">
+                        <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">Recursive Impact Summary:</p>
+                        <ul className="space-y-3">
+                            <li className="flex items-center gap-3 text-xs text-gray-400 font-medium">
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                                Total Revocation of Admin Portal Access
+                            </li>
+                            <li className="flex items-center gap-3 text-xs text-gray-400 font-medium">
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                                Disruption of Associated Sub-Label Hierarchy
+                            </li>
+                            <li className="flex items-center gap-3 text-xs text-gray-400 font-medium">
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                                Metadata & Revenue History Archive Detachment
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                        <p className="text-[10px] text-red-500 font-black uppercase tracking-widest">Warning: This action is irreversible.</p>
+                    </div>
+
+                    <div className="flex gap-4 pt-4">
+                        <Button variant="secondary" className="flex-1 font-black uppercase text-[10px]" onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting}>Abort Protocol</Button>
+                        <Button variant="danger" className="flex-1 font-black uppercase text-[10px] shadow-xl shadow-red-500/20" disabled={isDeleting} onClick={confirmDelete}>
+                            {isDeleting ? <Spinner className="w-4 h-4" /> : 'Execute Purge'}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* Block Confirmation Modal */}
             <Modal

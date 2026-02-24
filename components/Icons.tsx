@@ -191,3 +191,9 @@ export const SoundCloudIcon: React.FC<IconProps> = ({ className = 'w-6 h-6' }) =
         <path d="M11.56 8.87V17h8.76c1.48 0 2.68-1.21 2.68-2.7 0-1.48-1.2-2.69-2.68-2.69-.16 0-.31.02-.46.05C19.65 9.43 17.67 8 15.36 8c-1.56 0-2.95.66-3.8 1.69v-.82zm-2.5 1.38v6.75h1.25V10.25h-1.25zm-2.5 1.25v4.25h1.25V11.5h-1.25zm-2.5 1.25v1.75h1.25v-1.75H4.06z" />
     </svg>
 );
+
+export const RefreshIcon: React.FC<IconProps> = ({ className = 'w-5 h-5' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+);

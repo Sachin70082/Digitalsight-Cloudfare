@@ -69,6 +69,127 @@ const UniversalSearch: React.FC = () => {
     (results.releases && results.releases.length > 0)
   );
 
+  const isPlatformSide = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
+
+  if (isPlatformSide) {
+    return (
+      <div className="relative w-full max-w-md z-[50]" ref={containerRef} style={{ fontFamily: 'Verdana, Arial, Helvetica, sans-serif' }}>
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search database..."
+            value={query}
+            onFocus={() => setIsFocused(true)}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full border border-[#aaa] px-8 py-1 text-[11px] focus:border-[#0066cc] outline-none bg-white text-[#333] shadow-sm"
+          />
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[#666]">
+            {isSearching ? (
+              <div className="w-3 h-3 border-2 border-[#0066cc]/30 border-t-[#0066cc] rounded-full animate-spin" />
+            ) : (
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            )}
+          </div>
+          {query && (
+            <button 
+              onClick={() => { setQuery(''); setResults(null); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[#999] hover:text-[#333]"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          )}
+        </div>
+
+        {isOpen && query.trim().length > 1 && (
+          <div className="absolute top-full mt-1 w-full bg-white border border-[#aaa] shadow-xl z-[50] max-h-[75vh] overflow-hidden">
+            <div className="overflow-y-auto max-h-[75vh] p-0.5">
+              {isSearching && !results && (
+                <div className="py-4 text-center text-black text-[10px]">Searching...</div>
+              )}
+              
+              {results && !hasResults && !isSearching && (
+                <div className="py-4 text-center text-black text-[10px]">No results found</div>
+              )}
+
+              {results && hasResults && (
+                <div className="space-y-2 p-1">
+                  {results.releases && results.releases.length > 0 && (
+                    <div>
+                      <h4 className="px-2 py-0.5 text-[9px] font-bold text-black uppercase bg-[#f5f5f5] border-b border-[#eee] mb-1">Releases</h4>
+                      <div className="space-y-0.5">
+                        {results.releases.map(r => (
+                          <button
+                            key={r.id}
+                            onClick={() => handleSelect('release', r.id)}
+                            className="w-full text-left px-2 py-1 hover:bg-[#e5f3ff] text-[10px] flex items-center gap-2"
+                          >
+                            <img src={r.artworkUrl} className="w-6 h-6 border border-[#ccc]" alt="" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-black truncate">{r.title}</p>
+                              <p className="text-[8px] text-black font-mono">UPC: {r.upc}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {results.artists && results.artists.length > 0 && (
+                    <div>
+                      <h4 className="px-2 py-0.5 text-[9px] font-bold text-black uppercase bg-[#f5f5f5] border-b border-[#eee] mb-1">Artists</h4>
+                      <div className="space-y-0.5">
+                        {results.artists.map(a => (
+                          <button
+                            key={a.id}
+                            onClick={() => handleSelect('artist', a.id)}
+                            className="w-full text-left px-2 py-1 hover:bg-[#e5f3ff] text-[10px] flex items-center gap-2"
+                          >
+                            <div className="w-6 h-6 bg-[#0066cc] text-white flex items-center justify-center font-bold text-[9px]">
+                                {(a.name || 'A').charAt(0)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-black truncate">{a.name}</p>
+                              <p className="text-[8px] text-black truncate">{a.email}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {results.labels && results.labels.length > 0 && (
+                    <div>
+                      <h4 className="px-2 py-0.5 text-[9px] font-bold text-black uppercase bg-[#f5f5f5] border-b border-[#eee] mb-1">Labels</h4>
+                      <div className="space-y-0.5">
+                        {results.labels.map(l => (
+                          <button
+                            key={l.id}
+                            onClick={() => handleSelect('label', l.id)}
+                            className="w-full text-left px-2 py-1 hover:bg-[#e5f3ff] text-[10px] flex items-center gap-2"
+                          >
+                            <div className="w-6 h-6 bg-[#666] text-white flex items-center justify-center">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m-1 4h1m6-12h1m-1 4h1m-1 4h1m-1 4h1" /></svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-black truncate">{l.name}</p>
+                              <p className="text-[8px] text-black font-mono">ID: {l.id}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Search Backdrop Dimmer */}

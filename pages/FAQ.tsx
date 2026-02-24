@@ -1,10 +1,15 @@
 
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Input } from '../components/ui';
 import { QuestionMarkIcon } from '../components/Icons';
+import { AppContext } from '../App';
+import { UserRole } from '../types';
+import { PmaFieldset, PmaInfoBar, PmaSectionTitle, PmaInput, PmaButton } from '../components/PmaStyle';
 
 const FAQ: React.FC = () => {
+    const { user } = useContext(AppContext);
     const [search, setSearch] = useState('');
+    const isPlatformSide = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
 
     const faqs = [
         { q: "What audio formats do you accept?", a: "We exclusively accept high-fidelity WAV files (44.1kHz / 16-bit minimum). Compressing to MP3 or AAC will result in rejection by DSPs." },
@@ -16,6 +21,55 @@ const FAQ: React.FC = () => {
     ];
 
     const filtered = faqs.filter(f => f.q.toLowerCase().includes(search.toLowerCase()) || f.a.toLowerCase().includes(search.toLowerCase()));
+
+    if (isPlatformSide) {
+        return (
+            <div className="space-y-4">
+                <PmaInfoBar>
+                    <strong>Table:</strong> knowledge_vault &nbsp;|&nbsp; 
+                    <strong>Records:</strong> {faqs.length} &nbsp;|&nbsp;
+                    <span className="text-[#009900]">● Online</span>
+                </PmaInfoBar>
+
+                <PmaFieldset legend="Knowledge Vault - Documentation">
+                    <div className="p-4 space-y-4">
+                        <div className="flex justify-between items-center">
+                            <div className="text-xs text-black">Platform guides and technical specs</div>
+                            <PmaInput 
+                                label="Search Documentation" 
+                                value={search} 
+                                onChange={setSearch} 
+                                placeholder="Filter by keyword..." 
+                                className="w-64"
+                            />
+                        </div>
+
+                        <div className="space-y-4">
+                            {filtered.map((faq, i) => (
+                                <div key={i} className="border border-[#ccc] rounded overflow-hidden">
+                                    <div className="bg-gradient-to-b from-[#f7f7f7] to-[#e5e5e5] px-4 py-2 border-b border-[#ccc] font-bold text-sm text-black">
+                                        Q: {faq.q}
+                                    </div>
+                                    <div className="p-4 bg-white text-sm text-black leading-relaxed">
+                                        {faq.a}
+                                    </div>
+                                </div>
+                            ))}
+                            {filtered.length === 0 && (
+                                <div className="text-center py-8 text-black">No matches found.</div>
+                            )}
+                        </div>
+
+                        <div className="pt-4 border-t border-[#ccc]">
+                            <PmaSectionTitle>Technical Standards Manual</PmaSectionTitle>
+                            <p className="text-sm text-black mb-4">Download the full technical documentation including Excel bulk upload templates and ingestion protocols.</p>
+                            <PmaButton variant="primary">Download Ingest Protocol PDF</PmaButton>
+                        </div>
+                    </div>
+                </PmaFieldset>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-5xl mx-auto py-10 animate-fade-in">

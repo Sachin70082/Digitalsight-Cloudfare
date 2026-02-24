@@ -1,81 +1,175 @@
-
 import React, { useState, useContext, useEffect } from 'react';
 import { AppContext } from '../App';
 import { api } from '../services/mockApi';
 import { User, UserPermissions, UserRole } from '../types';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Spinner } from '../components/ui';
+import { PmaFieldset, PmaTable, PmaTR, PmaTD, PmaButton, PmaInput, PmaInfoBar } from '../components/PmaStyle';
 
-const Settings: React.FC = () => {
-    const { user, showToast } = useContext(AppContext);
-    const [subUsers, setSubUsers] = useState<User[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-    const [passwordChange, setPasswordChange] = useState({ old: '', new: '', confirm: '' });
+// phpMyAdmin style Settings view for admin users
+const PmaSettingsView: React.FC<{
+    user: User | null;
+    subUsers: User[];
+    isLoading: boolean;
+    isUpdatingPassword: boolean;
+    passwordChange: { old: string; new: string; confirm: string };
+    setPasswordChange: (p: { old: string; new: string; confirm: string }) => void;
+    handleTogglePermission: (subUserId: string, field: keyof UserPermissions, value: boolean) => void;
+    handlePasswordUpdate: (e: React.FormEvent) => void;
+    canManageSubUsers: boolean;
+}> = (props) => {
+    const { user, subUsers, isLoading, isUpdatingPassword, passwordChange, setPasswordChange, handleTogglePermission, handlePasswordUpdate, canManageSubUsers } = props;
 
-    useEffect(() => {
-        const fetchSubUsers = async () => {
-            if (user?.labelId && user.permissions.canCreateSubLabels) {
-                const allLabels = await api.getLabels();
-                const myChildren = allLabels.filter(l => l.parentLabelId === user.labelId);
-                const results: User[] = [];
-                for (const l of myChildren) {
-                    const admin = await api.getLabelAdmin(l.id);
-                    if (admin) results.push(admin);
-                }
-                setSubUsers(results);
-            }
-            setIsLoading(false);
-        };
-        fetchSubUsers();
-    }, [user]);
+    return (
+        <div className="space-y-4">
+            <PmaInfoBar>
+                <strong>Table:</strong> user_settings &nbsp;|&nbsp; 
+                <strong>User:</strong> {user?.email} &nbsp;|&nbsp;
+                <span className="text-[#009900]">● Authenticated</span>
+            </PmaInfoBar>
 
-    const handleTogglePermission = async (subUserId: string, field: keyof UserPermissions, value: boolean) => {
-        const targetUser = subUsers.find(u => u.id === subUserId);
-        if (!targetUser || !user) return;
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Left Column - Profile */}
+                <div className="space-y-4">
+                    <PmaFieldset legend="Authenticated Profile">
+                        <div className="p-4">
+                            <PmaTable headers={[{ label: 'Field' }, { label: 'Value' }]}>
+                                <PmaTR>
+                                    <PmaTD isLabel>Name</PmaTD>
+                                    <PmaTD className="text-black">{user?.name || 'User'}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Email</PmaTD>
+                                    <PmaTD className="font-mono text-black">{user?.email}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Role</PmaTD>
+                                    <PmaTD>
+                                        <span className="text-xs bg-[#f0f0f0] px-2 py-1 border border-[#ccc] text-black">
+                                            {user?.role}
+                                        </span>
+                                    </PmaTD>
+                                </PmaTR>
+                            </PmaTable>
+                        </div>
+                    </PmaFieldset>
 
-        const updatedPermissions = { ...targetUser.permissions, [field]: value };
-        try {
-            const updatedUser = await api.updateUserPermissions(subUserId, updatedPermissions, user);
-            setSubUsers(prev => prev.map(u => u.id === subUserId ? updatedUser : u));
-            showToast('Permissions updated successfully.', 'success');
-        } catch (error) {
-            showToast('Failed to update permissions.', 'error');
-        }
-    };
+                    <PmaFieldset legend="Reset Vault Key">
+                        <div className="p-4">
+                            <form onSubmit={handlePasswordUpdate} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-[#666] mb-1">Current Password</label>
+                                    <input
+                                        type="password"
+                                        value={passwordChange.old}
+                                        onChange={e => setPasswordChange({...passwordChange, old: e.target.value})}
+                                        className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-[#666] mb-1">New Password</label>
+                                    <input
+                                        type="password"
+                                        value={passwordChange.new}
+                                        onChange={e => setPasswordChange({...passwordChange, new: e.target.value})}
+                                        className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-[#666] mb-1">Confirm New Password</label>
+                                    <input
+                                        type="password"
+                                        value={passwordChange.confirm}
+                                        onChange={e => setPasswordChange({...passwordChange, confirm: e.target.value})}
+                                        className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none"
+                                    />
+                                </div>
+                                <PmaButton variant="primary" onClick={handlePasswordUpdate} disabled={isUpdatingPassword}>
+                                    {isUpdatingPassword ? 'Updating...' : 'Update Password'}
+                                </PmaButton>
+                            </form>
+                        </div>
+                    </PmaFieldset>
+                </div>
 
-    const handlePasswordUpdate = async (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        if (!passwordChange.old || !passwordChange.new || !passwordChange.confirm) {
-            showToast('All password fields are required.', 'error');
-            return;
-        }
+                {/* Right Column - Permissions */}
+                <div className="lg:col-span-2">
+                    <PmaFieldset legend="Network Permissions Hierarchy">
+                        <div className="p-4">
+                            {canManageSubUsers ? (
+                                subUsers.length === 0 ? (
+                                    <div className="text-center py-8 text-[#666]">
+                                        No managed Sub-Labels found.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {subUsers.map(subUser => (
+                                            <div key={subUser.id} className="border-2 border-[#ccc]">
+                                                <div className="bg-[#f5f5f5] px-4 py-2 border-b border-[#ccc] flex justify-between items-center">
+                                                    <div>
+                                                        <span className="font-bold text-black">{subUser.name}</span>
+                                                        <span className="text-xs text-black ml-2 font-mono">{subUser.email}</span>
+                                                    </div>
+                                                    <span className="text-xs bg-[#e0e0e0] px-2 py-1 border border-[#ccc] text-black">
+                                                        {subUser.role}
+                                                    </span>
+                                                </div>
+                                                <div className="p-4">
+                                                    <PmaTable headers={[{ label: 'Permission' }, { label: 'Status', className: 'text-center' }]}>
+                                                        {Object.entries(subUser.permissions).map(([key, val]) => (
+                                                            <PmaTR key={key}>
+                                                                <PmaTD>
+                                                                    <span className="text-sm text-black">
+                                                                        {key.replace('can', '').replace(/([A-Z])/g, ' $1').trim()}
+                                                                    </span>
+                                                                </PmaTD>
+                                                                <PmaTD className="text-center">
+                                                                    <button 
+                                                                        onClick={() => handleTogglePermission(subUser.id, key as keyof UserPermissions, !val)}
+                                                                        className={`px-3 py-1 text-xs border ${val ? 'bg-[#e8f4e8] text-[#009900] border-[#009900]' : 'bg-[#f5f5f5] text-black border-[#ccc]'}`}
+                                                                    >
+                                                                        {val ? 'Enabled' : 'Disabled'}
+                                                                    </button>
+                                                                </PmaTD>
+                                                            </PmaTR>
+                                                        ))}
+                                                    </PmaTable>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )
+                            ) : (
+                                <div className="text-center py-8 text-[#666]">
+                                    <div className="bg-[#fff3cd] border border-[#856404] p-4 mb-4">
+                                        <p className="text-[#856404] font-bold">Restricted Access</p>
+                                    </div>
+                                    <p className="text-sm">
+                                        Your network permissions are managed by your Parent Organization. 
+                                        Contact your administrator to adjust access levels.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </PmaFieldset>
+                </div>
+            </div>
+        </div>
+    );
+};
 
-        if (passwordChange.new !== passwordChange.confirm) {
-            showToast('New passwords do not match.', 'error');
-            return;
-        }
-
-        if (passwordChange.new.length < 6) {
-            showToast('New password must be at least 6 characters.', 'error');
-            return;
-        }
-
-        setIsUpdatingPassword(true);
-        try {
-            await api.changePassword(passwordChange.old, passwordChange.new);
-            showToast('Password updated in vault successfully.', 'success');
-            setPasswordChange({ old: '', new: '', confirm: '' });
-        } catch (err: any) {
-            showToast(err.message || 'Password update failed.', 'error');
-        } finally {
-            setIsUpdatingPassword(false);
-        }
-    };
-
-    if (isLoading) return <div className="flex justify-center p-20"><Spinner /></div>;
-
-    const canManageSubUsers = user?.permissions.canCreateSubLabels || user?.role === UserRole.LABEL_ADMIN;
+// Original dark theme Settings view for partner users
+const PartnerSettingsView: React.FC<{
+    user: User | null;
+    subUsers: User[];
+    isLoading: boolean;
+    isUpdatingPassword: boolean;
+    passwordChange: { old: string; new: string; confirm: string };
+    setPasswordChange: (p: { old: string; new: string; confirm: string }) => void;
+    handleTogglePermission: (subUserId: string, field: keyof UserPermissions, value: boolean) => void;
+    handlePasswordUpdate: (e: React.FormEvent) => void;
+    canManageSubUsers: boolean;
+}> = (props) => {
+    const { user, subUsers, isLoading, isUpdatingPassword, passwordChange, setPasswordChange, handleTogglePermission, handlePasswordUpdate, canManageSubUsers } = props;
 
     return (
         <div className="max-w-6xl mx-auto space-y-10 animate-fade-in">
@@ -182,6 +276,94 @@ const Settings: React.FC = () => {
             </div>
         </div>
     );
+};
+
+const Settings: React.FC = () => {
+    const { user, showToast } = useContext(AppContext);
+    const [subUsers, setSubUsers] = useState<User[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const [passwordChange, setPasswordChange] = useState({ old: '', new: '', confirm: '' });
+
+    const isPlatformSide = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
+
+    useEffect(() => {
+        const fetchSubUsers = async () => {
+            if (user?.labelId && user.permissions.canCreateSubLabels) {
+                const allLabels = await api.getLabels();
+                const myChildren = allLabels.filter(l => l.parentLabelId === user.labelId);
+                const results: User[] = [];
+                for (const l of myChildren) {
+                    const admin = await api.getLabelAdmin(l.id);
+                    if (admin) results.push(admin);
+                }
+                setSubUsers(results);
+            }
+            setIsLoading(false);
+        };
+        fetchSubUsers();
+    }, [user]);
+
+    const handleTogglePermission = async (subUserId: string, field: keyof UserPermissions, value: boolean) => {
+        const targetUser = subUsers.find(u => u.id === subUserId);
+        if (!targetUser || !user) return;
+
+        const updatedPermissions = { ...targetUser.permissions, [field]: value };
+        try {
+            const updatedUser = await api.updateUserPermissions(subUserId, updatedPermissions, user);
+            setSubUsers(prev => prev.map(u => u.id === subUserId ? updatedUser : u));
+            showToast('Permissions updated successfully.', 'success');
+        } catch (error) {
+            showToast('Failed to update permissions.', 'error');
+        }
+    };
+
+    const handlePasswordUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!passwordChange.old || !passwordChange.new || !passwordChange.confirm) {
+            showToast('All password fields are required.', 'error');
+            return;
+        }
+
+        if (passwordChange.new !== passwordChange.confirm) {
+            showToast('New passwords do not match.', 'error');
+            return;
+        }
+
+        if (passwordChange.new.length < 6) {
+            showToast('New password must be at least 6 characters.', 'error');
+            return;
+        }
+
+        setIsUpdatingPassword(true);
+        try {
+            await api.changePassword(passwordChange.old, passwordChange.new);
+            showToast('Password updated in vault successfully.', 'success');
+            setPasswordChange({ old: '', new: '', confirm: '' });
+        } catch (err: any) {
+            showToast(err.message || 'Password update failed.', 'error');
+        } finally {
+            setIsUpdatingPassword(false);
+        }
+    };
+
+    if (isLoading) return <div className="flex justify-center p-20"><Spinner /></div>;
+
+    const canManageSubUsers = user?.permissions.canCreateSubLabels || user?.role === UserRole.LABEL_ADMIN;
+
+    const commonProps = {
+        user, subUsers, isLoading, isUpdatingPassword, passwordChange, setPasswordChange,
+        handleTogglePermission, handlePasswordUpdate, canManageSubUsers
+    };
+
+    // Use phpMyAdmin style for admin/employee users
+    if (isPlatformSide) {
+        return <PmaSettingsView {...commonProps} />;
+    }
+
+    // Use dark theme for partner users
+    return <PartnerSettingsView {...commonProps} />;
 };
 
 export default Settings;

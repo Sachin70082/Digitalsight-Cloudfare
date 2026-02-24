@@ -113,6 +113,225 @@ const BlockedView: React.FC<{ reason?: string; onLogout: () => void }> = ({ reas
     </div>
 );
 
+// phpMyAdmin style layout for admin/employee users
+const PmaLayout: React.FC<{ user: any; logout: () => void; navLinks: any[] }> = ({ user, logout, navLinks }) => {
+    const { fontSize, setFontSize } = useContext(AppContext);
+
+    const handleZoomIn = () => setFontSize(Math.min(fontSize + 10, 150));
+    const handleZoomOut = () => setFontSize(Math.max(fontSize - 10, 70));
+
+    return (
+        <div className="min-h-screen bg-[#f5f5f5]" style={{ fontFamily: 'Verdana, Arial, Helvetica, sans-serif' }}>
+            {/* phpMyAdmin style top header */}
+            <div className="bg-gradient-to-b from-[#f7f7f7] to-[#e5e5e5] border-b border-[#aaa] px-4 py-1.5 shadow-sm">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect fill='%23336699' width='32' height='32' rx='4'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='Arial' font-size='12' font-weight='bold'%3EDB%3C/text%3E%3C/svg%3E" alt="Logo" className="w-6 h-6" />
+                            <span className="text-lg font-bold text-black tracking-tight">DigitalSight</span>
+                        </div>
+                        <div className="h-6 w-[1px] bg-[#ccc]"></div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-[#666] uppercase tracking-widest bg-[#eee] px-2 py-0.5 rounded border border-[#ddd]">Administration</span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center bg-white border border-[#aaa] rounded shadow-sm overflow-hidden">
+                                <button 
+                                    onClick={handleZoomOut}
+                                    className="px-2.5 py-1 text-black hover:bg-[#f0f0f0] font-bold border-r border-[#eee] transition-colors"
+                                    title="Zoom Out"
+                                >
+                                    A-
+                                </button>
+                                <span className="px-2 text-[10px] text-[#666] font-mono bg-[#fafafa]">{fontSize}%</span>
+                                <button 
+                                    onClick={handleZoomIn}
+                                    className="px-2.5 py-1 text-black hover:bg-[#f0f0f0] font-bold border-l border-[#eee] transition-colors"
+                                    title="Zoom In"
+                                >
+                                    A+
+                                </button>
+                            </div>
+                            <div className="w-[240px]">
+                                <UniversalSearch />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                            <div className="flex flex-col items-end leading-tight">
+                                <div className="text-[11px] text-black">
+                                    Logged in as: <strong className="text-[#0066cc]">{user?.name}</strong>
+                                </div>
+                                <div className="text-[9px] text-[#666] font-bold uppercase tracking-tighter">
+                                    {user?.designation || user?.role}
+                                </div>
+                            </div>
+                            
+                            <div className="h-8 w-[1px] bg-[#ccc]"></div>
+                            
+                            <div className="flex items-center gap-3">
+                                <div className="text-[10px] text-[#444] font-medium bg-white/50 px-2 py-1 rounded border border-[#eee]">
+                                    {new Date().toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                </div>
+                                <button 
+                                    onClick={logout} 
+                                    className="px-3 py-1 bg-gradient-to-b from-[#fff] to-[#f0f0f0] border border-[#aaa] rounded hover:border-[#cc0000] hover:text-[#cc0000] hover:bg-[#fff5f5] text-[10px] font-bold transition-all shadow-sm active:shadow-inner text-black flex items-center gap-1.5"
+                                >
+                                    <LogoutIcon className="w-3 h-3" />
+                                    Log out
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex">
+                {/* Left sidebar - phpMyAdmin style navigation */}
+                <div className="w-64 bg-[#f0f0f0] border-r border-[#aaa] min-h-[calc(100vh-35px)] p-1 overflow-y-auto shadow-inner">
+                    {/* Navigation Panel */}
+                    <div className="bg-white border border-[#aaa] rounded mb-2 shadow-sm">
+                        <div className="bg-gradient-to-b from-[#e8e8e8] to-[#d8d8d8] px-2 py-1 border-b border-[#aaa]">
+                            <span className="font-bold text-black text-[11px]">Navigation</span>
+                        </div>
+                        <div className="p-1 text-[11px]">
+                            {navLinks.map((link, index) => (
+                                <NavLink
+                                    key={link.to}
+                                    to={link.to}
+                                    end={link.to === "/"}
+                                    className={({ isActive }) => `flex items-center gap-2 px-2 py-1 rounded text-[#0066cc] hover:bg-[#e5f3ff] ${isActive ? 'bg-[#e5f3ff] font-bold text-[#004499]' : ''}`}
+                                >
+                                    <span className="text-black text-[10px]">📁</span>
+                                    <span>{link.text}</span>
+                                </NavLink>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Server Information */}
+                    <div className="bg-white border border-[#aaa] rounded shadow-sm">
+                        <div className="bg-gradient-to-b from-[#e8e8e8] to-[#d8d8d8] px-2 py-1 border-b border-[#aaa]">
+                            <span className="font-bold text-black text-[11px]">Server Information</span>
+                        </div>
+                        <div className="p-2 text-[10px] text-black space-y-1">
+                            <div><strong>Server:</strong> Production</div>
+                            <div><strong>Database:</strong> DigitalSight DB</div>
+                            <div><strong>Version:</strong> 1.0.0</div>
+                            <div><strong>User:</strong> <span className="text-[#0066cc] font-bold">{user?.role}</span></div>
+                            <div className="pt-1 border-t border-[#eee] mt-1">
+                                <span className="text-[#009900]">●</span> All systems operational
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Main content area */}
+                <div className="flex-1 p-3 overflow-y-auto bg-white">
+                    <Outlet />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Original dark layout for partner users
+const PartnerLayout: React.FC<{ user: any; logout: () => void; navLinks: any[]; isPlatformSide: boolean }> = ({ user, logout, navLinks, isPlatformSide }) => {
+    const { fontSize, setFontSize } = useContext(AppContext);
+    const headerMainText = (user.labelName || user.artistName || user.name) || 'User';
+    const headerSubText = user.role;
+
+    const handleZoomIn = () => setFontSize(Math.min(fontSize + 10, 150));
+    const handleZoomOut = () => setFontSize(Math.max(fontSize - 10, 70));
+
+    return (
+        <div className="flex h-screen bg-gray-900 font-sans">
+            <aside className="w-64 bg-black flex-shrink-0 flex flex-col border-r border-gray-800">
+                <div className="h-16 flex items-center px-6 gap-3">
+                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-black font-black text-lg shadow-lg shadow-primary/20">D</div>
+                    <span className="text-xl font-black text-white tracking-tighter uppercase">Digitalsight</span>
+                </div>
+                <div className="px-4 py-2 border-b border-gray-800/50">
+                    <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Access Mode</p>
+                    <p className="text-[11px] font-black uppercase text-blue-400">
+                        Partner Portal
+                    </p>
+                </div>
+                <nav className="flex-grow px-2 py-4 overflow-y-auto">
+                    {navLinks.map(link => (
+                        <NavLink
+                            key={link.to}
+                            to={link.to}
+                            className={({ isActive }) => `flex items-center px-4 py-2 mt-2 text-sm font-semibold rounded-lg transition-colors duration-200 ${isActive ? 'bg-primary text-black shadow-[0_0_15px_rgba(29,185,84,0.2)]' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                            end={link.to === "/"}
+                        >
+                            <span className={link.icon ? "" : "invisible"}>{link.icon}</span>
+                            <span className="ml-3 tracking-tight">{link.text}</span>
+                        </NavLink>
+                    ))}
+                </nav>
+                <div className="p-4 border-t border-gray-800">
+                    <HubMenu />
+                    <div className="mb-4 px-4 py-3 bg-gray-800/40 rounded-xl border border-gray-700/50">
+                        <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1">Authenticated</p>
+                        <p className="text-xs text-white truncate font-bold">{user.name || 'Account'}</p>
+                        <p className="text-[9px] text-primary font-black uppercase mt-0.5">{user.designation || user.role}</p>
+                    </div>
+                    <button onClick={logout} className="flex items-center w-full px-4 py-2 text-sm font-semibold text-gray-400 rounded-lg hover:text-red-500 hover:bg-red-500/5 transition-all">
+                        <LogoutIcon />
+                        <span className="ml-3 tracking-tight">Sign Out</span>
+                    </button>
+                </div>
+            </aside>
+
+            <main className="flex-1 flex flex-col overflow-hidden">
+                <header className="h-16 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-6 gap-4">
+                    <div className="flex items-center bg-gray-900/50 border border-gray-700 rounded-lg p-1">
+                        <button 
+                            onClick={handleZoomOut}
+                            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                            title="Zoom Out"
+                        >
+                            <span className="text-lg">-</span>
+                        </button>
+                        <span className="px-2 text-[10px] text-gray-500 font-mono min-w-[40px] text-center">{fontSize}%</span>
+                        <button 
+                            onClick={handleZoomIn}
+                            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                            title="Zoom In"
+                        >
+                            <span className="text-lg">+</span>
+                        </button>
+                    </div>
+                    <div className="flex-1 flex justify-center">
+                        <UniversalSearch />
+                    </div>
+                    <div className="flex items-center group cursor-default">
+                        <div className="text-right mr-4 hidden sm:block">
+                            <p className="text-white text-sm font-black tracking-tight leading-none uppercase">{headerMainText}</p>
+                            <p className="text-[9px] text-gray-500 uppercase font-bold mt-1 tracking-widest">{headerSubText}</p>
+                        </div>
+                        <div className="relative">
+                            <span className="inline-flex h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark text-black items-center justify-center font-black shadow-lg shadow-primary/20 border border-white/10 group-hover:scale-105 transition-transform duration-300">
+                                {user.name?.charAt(0) || 'U'}
+                            </span>
+                            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-gray-800"></span>
+                        </div>
+                    </div>
+                </header>
+                <div className="flex-1 p-0 overflow-y-auto custom-scrollbar">
+                    <div className="p-6">
+                        <Outlet />
+                    </div>
+                </div>
+            </main>
+        </div>
+    );
+};
+
 const Layout: React.FC = () => {
     const { user, logout } = useContext(AppContext);
 
@@ -122,14 +341,39 @@ const Layout: React.FC = () => {
         return <BlockedView reason={user.blockReason} onLogout={logout} />;
     }
 
-    const navLinks = [
-        { to: "/", text: "Admin Console", icon: <DashboardIcon /> },
-    ];
-
     const isPlatformSide = user.role === UserRole.OWNER || user.role === UserRole.EMPLOYEE;
 
+    // Security Check: If user is trying to access admin-only routes but isn't an admin
+    const isAdminRoute = window.location.pathname.startsWith('/labels') || 
+                         window.location.pathname.startsWith('/employees') || 
+                         window.location.pathname.startsWith('/notices') || 
+                         window.location.pathname.startsWith('/correction-queue');
+    
+    if (isAdminRoute && !isPlatformSide) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-900 p-6">
+                <div className="max-w-md w-full bg-gray-800 border border-red-500/30 rounded-2xl p-8 text-center shadow-2xl">
+                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    </div>
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Access Denied</h2>
+                    <p className="text-gray-400 text-sm mb-6">
+                        You do not have the required administrative privileges to access this secure area.
+                    </p>
+                    <Link to="/" className="inline-block px-8 py-3 bg-primary text-black font-black uppercase text-xs tracking-widest rounded-xl hover:bg-primary-light transition-colors">
+                        Return to Dashboard
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    const navLinks = [
+        { to: "/", text: "Dashboard", icon: <DashboardIcon /> },
+    ];
+
     if (isPlatformSide) {
-        navLinks[0].text = "Admin Console";
+        navLinks[0].text = "Dashboard";
         navLinks.push({ to: "/notices", text: "Board Notices", icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg> });
 
         if (user.role === UserRole.OWNER || user.permissions?.canManageReleases) {
@@ -159,75 +403,13 @@ const Layout: React.FC = () => {
         navLinks.push({ to: "/settings", text: "Settings", icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg> });
     }
 
-    const headerMainText = (isPlatformSide ? (user.role === UserRole.OWNER ? "Master Console" : "Admin Panel") : (user.labelName || user.artistName || user.name)) || 'User';
-    const headerSubText = isPlatformSide ? (user.designation || user.role) : user.role;
+    // Use phpMyAdmin style layout for admin/employee users
+    if (isPlatformSide) {
+        return <PmaLayout user={user} logout={logout} navLinks={navLinks} />;
+    }
 
-    return (
-        <div className="flex h-screen bg-gray-900 font-sans">
-            <aside className="w-64 bg-black flex-shrink-0 flex flex-col border-r border-gray-800">
-                <div className="h-16 flex items-center px-6 gap-3">
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-black font-black text-lg shadow-lg shadow-primary/20">D</div>
-                    <span className="text-xl font-black text-white tracking-tighter uppercase">Digitalsight</span>
-                </div>
-                <div className="px-4 py-2 border-b border-gray-800/50">
-                    <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Access Mode</p>
-                    <p className={`text-[11px] font-black uppercase ${isPlatformSide ? 'text-primary' : 'text-blue-400'}`}>
-                        {isPlatformSide ? 'Platform Authority' : 'Partner Portal'}
-                    </p>
-                </div>
-                <nav className="flex-grow px-2 py-4 overflow-y-auto">
-                    {navLinks.map(link => (
-                        <NavLink
-                            key={link.to}
-                            to={link.to}
-                            className={({ isActive }) => `flex items-center px-4 py-2 mt-2 text-sm font-semibold rounded-lg transition-colors duration-200 ${isActive ? 'bg-primary text-black shadow-[0_0_15px_rgba(29,185,84,0.2)]' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
-                            end={link.to === "/"}
-                        >
-                            <span className={link.icon ? "" : "invisible"}>{link.icon}</span>
-                            <span className="ml-3 tracking-tight">{link.text}</span>
-                        </NavLink>
-                    ))}
-                </nav>
-                <div className="p-4 border-t border-gray-800">
-                    {!isPlatformSide && <HubMenu />}
-                    <div className="mb-4 px-4 py-3 bg-gray-800/40 rounded-xl border border-gray-700/50">
-                        <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1">Authenticated</p>
-                        <p className="text-xs text-white truncate font-bold">{user.name || 'Account'}</p>
-                        <p className="text-[9px] text-primary font-black uppercase mt-0.5">{user.designation || user.role}</p>
-                    </div>
-                    <button onClick={logout} className="flex items-center w-full px-4 py-2 text-sm font-semibold text-gray-400 rounded-lg hover:text-red-500 hover:bg-red-500/5 transition-all">
-                        <LogoutIcon />
-                        <span className="ml-3 tracking-tight">Sign Out</span>
-                    </button>
-                </div>
-            </aside>
-
-            <main className="flex-1 flex flex-col overflow-hidden">
-                <header className="h-16 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-6 gap-4">
-                    <div className="flex-1 flex justify-center">
-                        <UniversalSearch />
-                    </div>
-                    <div className="flex items-center group cursor-default">
-                        <div className="text-right mr-4 hidden sm:block">
-                            <p className="text-white text-sm font-black tracking-tight leading-none uppercase">{headerMainText}</p>
-                            <p className="text-[9px] text-gray-500 uppercase font-bold mt-1 tracking-widest">{headerSubText}</p>
-                        </div>
-                        <div className="relative">
-                            <span className="inline-flex h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary-dark text-black items-center justify-center font-black shadow-lg shadow-primary/20 border border-white/10 group-hover:scale-105 transition-transform duration-300">
-                                {user.name?.charAt(0) || 'U'}
-                            </span>
-                            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-gray-800"></span>
-                        </div>
-                    </div>
-                </header>
-                <div className="flex-1 p-0 overflow-y-auto custom-scrollbar">
-                    <div className="p-6">
-                        <Outlet />
-                    </div>
-                </div>
-            </main>
-        </div>
-    );
+    // Use dark partner layout for label/artist users
+    return <PartnerLayout user={user} logout={logout} navLinks={navLinks} isPlatformSide={isPlatformSide} />;
 };
 
 export default Layout;

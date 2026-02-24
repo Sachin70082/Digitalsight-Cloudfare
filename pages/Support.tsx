@@ -1,15 +1,102 @@
 
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Textarea } from '../components/ui';
 import { SupportIcon } from '../components/Icons';
+import { AppContext } from '../App';
+import { UserRole } from '../types';
+import { PmaFieldset, PmaInfoBar, PmaSectionTitle, PmaInput, PmaButton, PmaSelect } from '../components/PmaStyle';
 
 const Support: React.FC = () => {
+    const { user } = useContext(AppContext);
     const [submitted, setSubmitted] = useState(false);
+    const isPlatformSide = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitted(true);
     };
+
+    if (isPlatformSide) {
+        return (
+            <div className="space-y-4">
+                <PmaInfoBar>
+                    <strong>Table:</strong> support_tickets &nbsp;|&nbsp; 
+                    <strong>Status:</strong> Command Center Active &nbsp;|&nbsp;
+                    <span className="text-[#009900]">● Online</span>
+                </PmaInfoBar>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-2">
+                        <PmaFieldset legend="Open New Inquiry">
+                            <div className="p-4">
+                                {submitted ? (
+                                    <div className="text-center py-12 space-y-4">
+                                        <div className="bg-[#e8f4e8] border border-[#009900] p-4 inline-block">
+                                            <p className="text-[#009900] font-bold text-lg">Ticket Transmitted Successfully</p>
+                                            <p className="text-sm">Reference: #SPT-{Math.floor(Math.random() * 90000) + 10000}</p>
+                                        </div>
+                                        <div className="block">
+                                            <PmaButton variant="secondary" onClick={() => setSubmitted(false)}>Open Another Ticket</PmaButton>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <form onSubmit={handleSubmit} className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <PmaInput label="Subject / Issue Area" placeholder="e.g. Metadata Correction" />
+                                            <PmaSelect 
+                                                label="Priority Level"
+                                                value="Normal"
+                                                onChange={() => {}}
+                                                options={[
+                                                    { value: 'Normal', label: 'Normal (Routine)' },
+                                                    { value: 'High', label: 'High (Correction Pending)' },
+                                                    { value: 'Urgent', label: 'Urgent (Takedown Request)' }
+                                                ]}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-[#666] mb-1">Detailed Description</label>
+                                            <textarea 
+                                                className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none min-h-[150px]"
+                                                placeholder="Please provide all relevant technical details..."
+                                                required
+                                            />
+                                        </div>
+                                        <div className="flex justify-between items-center pt-4 border-t border-[#ccc]">
+                                            <span className="text-xs text-black">Average response: 4-6 Hours</span>
+                                            <PmaButton variant="primary" type="submit">Submit Ticket</PmaButton>
+                                        </div>
+                                    </form>
+                                )}
+                            </div>
+                        </PmaFieldset>
+                    </div>
+
+                    <div className="space-y-4">
+                        <PmaFieldset legend="Priority Channels">
+                            <div className="p-4 space-y-4">
+                                <div className="border border-[#ccc] p-3 bg-[#f9f9f9]">
+                                    <p className="font-bold text-sm text-black">Metadata Hotline</p>
+                                    <p className="text-xs font-mono text-[#0066cc]">meta@distro.pro</p>
+                                </div>
+                                <div className="border border-[#ccc] p-3 bg-[#f9f9f9]">
+                                    <p className="font-bold text-sm text-black">Legal / DMCA</p>
+                                    <p className="text-xs font-mono text-[#0066cc]">legal@distro.pro</p>
+                                </div>
+                            </div>
+                        </PmaFieldset>
+
+                        <PmaFieldset legend="Internal Chat">
+                            <div className="p-4 text-center space-y-3">
+                                <p className="text-sm text-black">Agents currently <span className="text-[#009900] font-bold">Online</span></p>
+                                <PmaButton variant="secondary" className="w-full">Launch Console</PmaButton>
+                            </div>
+                        </PmaFieldset>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-4xl mx-auto py-10 animate-fade-in">

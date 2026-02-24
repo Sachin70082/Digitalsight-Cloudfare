@@ -1,16 +1,19 @@
-
 import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { AppContext } from '../App';
 import { api } from '../services/mockApi';
 import { Artist, ArtistType, User, UserRole, Label } from '../types';
 import { Button, Card, Input, Modal, Spinner, PageLoader, Pagination, Table, THead, TBody, TR, TH, TD, Skeleton } from '../components/ui';
+import { PmaFieldset, PmaTable, PmaTR, PmaTD, PmaButton, PmaInput, PmaSelect, PmaStatusBadge, PmaPagination, PmaInfoBar } from '../components/PmaStyle';
 
-const ArtistForm: React.FC<{
-    initialData?: Artist, 
-    onSave: (data: {artist: Artist, user?: User}) => void, 
-    onClose: () => void
-}> = ({ initialData, onSave, onClose }) => {
-    const { user, showToast } = useContext(AppContext);
+// phpMyAdmin style Artist Form
+const PmaArtistForm: React.FC<{
+    initialData?: Artist,
+    onSave: (data: {artist: Artist, user?: User}) => void,
+    onClose: () => void,
+    hierarchyLabels: Label[],
+    user: User | null
+}> = ({ initialData, onSave, onClose, hierarchyLabels, user }) => {
+    const { showToast } = useContext(AppContext);
     const [name, setName] = useState(initialData?.name || '');
     const [type, setType] = useState<ArtistType>(initialData?.type || ArtistType.SINGER);
     const [email, setEmail] = useState(initialData?.email || '');
@@ -18,19 +21,7 @@ const ArtistForm: React.FC<{
     const [appleMusicId, setAppleMusicId] = useState(initialData?.appleMusicId || '');
     const [instagramUrl, setInstagramUrl] = useState(initialData?.instagramUrl || '');
     const [targetLabelId, setTargetLabelId] = useState(initialData?.labelId || user?.labelId || '');
-    const [hierarchyLabels, setHierarchyLabels] = useState<Label[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-
-    useEffect(() => {
-        const loadHierarchy = async () => {
-            if (user?.labelId) {
-                const subLabels = await api.getSubLabels(user.labelId);
-                const selfLabel = await api.getLabel(user.labelId);
-                setHierarchyLabels(selfLabel ? [selfLabel, ...subLabels] : subLabels);
-            }
-        };
-        loadHierarchy();
-    }, [user]);
 
     const isEditing = !!initialData;
 
@@ -54,16 +45,351 @@ const ArtistForm: React.FC<{
                 showToast(`Profile for ${name} updated successfully.`, 'success');
                 onSave({ artist: updatedArtist });
             } else {
-                // Check artist limit
                 const targetLabel = hierarchyLabels.find(l => l.id === targetLabelId);
                 if (targetLabel && targetLabel.maxArtists !== undefined && targetLabel.maxArtists !== 0) {
                     const allArtists = await api.getAllArtists();
                     const currentCount = allArtists.filter(a => a.labelId === targetLabelId).length;
                     if (currentCount >= targetLabel.maxArtists) {
-                        throw new Error(`Artist limit reached for this label (${targetLabel.maxArtists}). Please contact support to upgrade.`);
+                        throw new Error(`Artist limit reached for this label (${targetLabel.maxArtists}).`);
                     }
                 }
+                const result = await api.addArtist(artistData);
+                showToast(`New artist ${name} onboarded.`, 'success');
+                onSave(result);
+            }
+        } catch (err: any) {
+            showToast(err.message || 'Failed to save artist details', 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
+    return (
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+            {hierarchyLabels.length > 1 && (
+                <div>
+                    <label className="block text-xs font-bold text-black mb-1">Target Label</label>
+                    <select
+                        value={targetLabelId}
+                        onChange={e => setTargetLabelId(e.target.value)}
+                        className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                    >
+                        {hierarchyLabels.map(l => (
+                            <option key={l.id} value={l.id}>
+                                {l.id === user?.labelId ? `[MASTER] ${l.name}` : `[CHILD] ${l.name}`}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-xs font-bold text-black mb-1">Artist/Band Name</label>
+                    <input
+                        type="text"
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        required
+                        placeholder="Stage Name"
+                        className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-black mb-1">Primary Role</label>
+                    <select
+                        value={type}
+                        onChange={e => setType(e.target.value as ArtistType)}
+                        className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                    >
+                        {Object.values(ArtistType).map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                </div>
+            </div>
+
+            <div className="border-t border-[#ccc] pt-4">
+                <h4 className="text-xs font-bold text-black uppercase mb-3">Contact & Portal Access</h4>
+                <div>
+                    <label className="block text-xs font-bold text-black mb-1">Email</label>
+                    <input
+                        type="email"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        placeholder="Email for portal login"
+                        className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                    />
+                </div>
+            </div>
+
+            <div className="border-t border-[#ccc] pt-4">
+                <h4 className="text-xs font-bold text-black uppercase mb-3">Store Profile Mappings</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-black mb-1">Spotify Artist ID</label>
+                        <input
+                            type="text"
+                            value={spotifyId}
+                            onChange={e => setSpotifyId(e.target.value)}
+                            placeholder="e.g. 5444a57..."
+                            className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-black mb-1">Apple Music ID</label>
+                        <input
+                            type="text"
+                            value={appleMusicId}
+                            onChange={e => setAppleMusicId(e.target.value)}
+                            placeholder="e.g. 14407..."
+                            className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                        />
+                    </div>
+                </div>
+                <div className="mt-4">
+                    <label className="block text-xs font-bold text-black mb-1">Instagram Handle/URL</label>
+                    <input
+                        type="text"
+                        value={instagramUrl}
+                        onChange={e => setInstagramUrl(e.target.value)}
+                        placeholder="https://instagram.com/..."
+                        className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                    />
+                </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t border-[#ccc]">
+                <PmaButton variant="secondary" onClick={onClose}>Cancel</PmaButton>
+                <PmaButton variant="primary" onClick={handleSubmit} disabled={isLoading}>
+                    {isLoading ? 'Saving...' : (isEditing ? 'Update' : 'Create')}
+                </PmaButton>
+            </div>
+        </form>
+    );
+};
+
+// phpMyAdmin style Artists view for admin users
+const PmaArtistsView: React.FC<{
+    user: User | null;
+    artists: Artist[];
+    isLoading: boolean;
+    filter: string;
+    setFilter: (f: string) => void;
+    currentPage: number;
+    setCurrentPage: (n: number) => void;
+    filteredArtists: Artist[];
+    paginatedArtists: Artist[];
+    itemsPerPage: number;
+    isModalOpen: boolean;
+    setIsModalOpen: (open: boolean) => void;
+    editingArtist: Artist | null;
+    setEditingArtist: (a: Artist | null) => void;
+    newCredentials: User | null;
+    setNewCredentials: (u: User | null) => void;
+    justCreated: Artist | null;
+    setJustCreated: (a: Artist | null) => void;
+    isDeleteModalOpen: boolean;
+    setIsDeleteModalOpen: (open: boolean) => void;
+    artistToDelete: Artist | null;
+    isDeleting: boolean;
+    confirmDelete: () => void;
+    handleOpenEdit: (a: Artist) => void;
+    handleOpenDelete: (a: Artist) => void;
+    handleArtistSaved: (result: {artist: Artist, user?: User}) => void;
+    hierarchyLabels: Label[];
+}> = (props) => {
+    const {
+        user, artists, isLoading, filter, setFilter, currentPage, setCurrentPage,
+        filteredArtists, paginatedArtists, itemsPerPage, isModalOpen, setIsModalOpen,
+        editingArtist, setEditingArtist, newCredentials, setNewCredentials, justCreated, setJustCreated,
+        isDeleteModalOpen, setIsDeleteModalOpen, artistToDelete, isDeleting, confirmDelete,
+        handleOpenEdit, handleOpenDelete, handleArtistSaved, hierarchyLabels
+    } = props;
+
+    return (
+        <div className="space-y-4">
+            <PmaInfoBar>
+                <strong>Table:</strong> artists &nbsp;|&nbsp; 
+                <strong>Records:</strong> {filteredArtists.length} &nbsp;|&nbsp;
+                <span className="text-[#009900]">● Active</span>
+            </PmaInfoBar>
+
+            <PmaFieldset legend="Artist Roster">
+                <div className="p-4">
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-[#666]">Search:</span>
+                            <input
+                                type="text"
+                                value={filter}
+                                onChange={e => setFilter(e.target.value)}
+                                placeholder="Filter artists..."
+                                className="border-2 border-[#ccc] px-3 py-1.5 text-sm w-48 focus:border-[#0066cc] outline-none"
+                            />
+                        </div>
+                        <PmaButton variant="primary" onClick={() => { setEditingArtist(null); setIsModalOpen(true); }}>
+                            + Add Artist
+                        </PmaButton>
+                    </div>
+
+                    <div className="text-xs text-[#666] mb-2">
+                        Showing {paginatedArtists.length} of {filteredArtists.length} records
+                    </div>
+
+                    <PmaTable
+                        headers={[
+                            { label: 'Identity' },
+                            { label: 'Role' },
+                            { label: 'Contact' },
+                            { label: 'Mappings' },
+                            { label: 'Actions', className: 'text-center' }
+                        ]}
+                    >
+                        {isLoading && artists.length === 0 ? (
+                            [...Array(5)].map((_, i) => (
+                                <PmaTR key={i}>
+                                    <PmaTD>Loading...</PmaTD>
+                                    <PmaTD>...</PmaTD>
+                                    <PmaTD>...</PmaTD>
+                                    <PmaTD>...</PmaTD>
+                                    <PmaTD className="text-center">...</PmaTD>
+                                </PmaTR>
+                            ))
+                        ) : paginatedArtists.length === 0 ? (
+                            <PmaTR>
+                                <PmaTD colSpan={5} className="text-center py-8 text-[#999]">
+                                    No artists found
+                                </PmaTD>
+                            </PmaTR>
+                        ) : paginatedArtists.map(artist => (
+                            <PmaTR key={artist.id}>
+                                <PmaTD isLabel>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 bg-[#0066cc] text-white rounded flex items-center justify-center font-bold text-sm">
+                                            {(artist.name || '?').charAt(0)}
+                                        </div>
+                                        <div>
+                                            <div className="font-medium text-black">{artist.name || 'Unknown'}</div>
+                                            <div className="text-xs text-[#444] font-mono">{artist.id?.toUpperCase()}</div>
+                                        </div>
+                                    </div>
+                                </PmaTD>
+                                <PmaTD>
+                                    <span className="text-xs bg-[#f0f0f0] px-2 py-1 border border-[#ccc] text-black">
+                                        {artist.type || 'UNKNOWN'}
+                                    </span>
+                                </PmaTD>
+                                <PmaTD className="text-xs font-mono text-black">{artist.email || '-'}</PmaTD>
+                                <PmaTD>
+                                    <div className="flex gap-1">
+                                        {artist.spotifyId && <span className="text-[10px] bg-[#e8f4e8] text-[#009900] px-1.5 py-0.5 border border-[#009900]">Spotify</span>}
+                                        {artist.appleMusicId && <span className="text-[10px] bg-[#ffe8e8] text-[#cc0000] px-1.5 py-0.5 border border-[#cc0000]">Apple</span>}
+                                        {artist.instagramUrl && <span className="text-[10px] bg-[#f0e8ff] text-[#6600cc] px-1.5 py-0.5 border border-[#6600cc]">Social</span>}
+                                    </div>
+                                </PmaTD>
+                                <PmaTD className="text-center">
+                                    <div className="flex justify-center gap-2">
+                                        <button onClick={() => handleOpenEdit(artist)} className="text-[#0066cc] hover:underline text-xs">Edit</button>
+                                        <button onClick={() => handleOpenDelete(artist)} className="text-[#cc0000] hover:underline text-xs">Delete</button>
+                                    </div>
+                                </PmaTD>
+                            </PmaTR>
+                        ))}
+                    </PmaTable>
+
+                    <PmaPagination
+                        currentPage={currentPage}
+                        totalItems={filteredArtists.length}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                    />
+                </div>
+            </PmaFieldset>
+
+            {/* Create/Edit Modal */}
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={newCredentials || justCreated ? "Result" : (editingArtist ? `Edit: ${editingArtist.name}` : "Add Artist")} size="2xl">
+                {!newCredentials && !justCreated ? (
+                    <PmaArtistForm
+                        initialData={editingArtist || undefined}
+                        onClose={() => setIsModalOpen(false)}
+                        onSave={handleArtistSaved}
+                        hierarchyLabels={hierarchyLabels}
+                        user={user}
+                    />
+                ) : (
+                    <div className="p-4 space-y-4">
+                        <div className="bg-[#e8f4e8] border border-[#009900] p-4">
+                            <p className="text-[#009900] font-bold">Artist created successfully!</p>
+                        </div>
+                        {newCredentials && (
+                            <div className="border-2 border-[#ccc] p-4 space-y-3">
+                                <div>
+                                    <span className="text-xs text-[#666]">Login Email</span>
+                                    <p className="font-medium">{newCredentials.email}</p>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-[#666]">Temporary Password</span>
+                                    <p className="font-mono text-lg bg-[#f5f5f5] px-3 py-2 border border-[#ccc] inline-block">{newCredentials.password}</p>
+                                </div>
+                            </div>
+                        )}
+                        <PmaButton variant="primary" onClick={() => setIsModalOpen(false)} className="w-full">
+                            Close
+                        </PmaButton>
+                    </div>
+                )}
+            </Modal>
+        </div>
+    );
+};
+
+// Original dark theme Artist Form for partner users
+const PartnerArtistForm: React.FC<{
+    initialData?: Artist,
+    onSave: (data: {artist: Artist, user?: User}) => void,
+    onClose: () => void,
+    hierarchyLabels: Label[],
+    user: User | null
+}> = ({ initialData, onSave, onClose, hierarchyLabels, user }) => {
+    const { showToast } = useContext(AppContext);
+    const [name, setName] = useState(initialData?.name || '');
+    const [type, setType] = useState<ArtistType>(initialData?.type || ArtistType.SINGER);
+    const [email, setEmail] = useState(initialData?.email || '');
+    const [spotifyId, setSpotifyId] = useState(initialData?.spotifyId || '');
+    const [appleMusicId, setAppleMusicId] = useState(initialData?.appleMusicId || '');
+    const [instagramUrl, setInstagramUrl] = useState(initialData?.instagramUrl || '');
+    const [targetLabelId, setTargetLabelId] = useState(initialData?.labelId || user?.labelId || '');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const isEditing = !!initialData;
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+
+        const artistData = {
+            name,
+            type,
+            email,
+            spotifyId,
+            appleMusicId,
+            instagramUrl,
+            labelId: targetLabelId,
+        };
+        
+        try {
+            if (isEditing) {
+                const updatedArtist = await api.updateArtist(initialData.id, artistData, user as User);
+                showToast(`Profile for ${name} updated successfully.`, 'success');
+                onSave({ artist: updatedArtist });
+            } else {
+                const targetLabel = hierarchyLabels.find(l => l.id === targetLabelId);
+                if (targetLabel && targetLabel.maxArtists !== undefined && targetLabel.maxArtists !== 0) {
+                    const allArtists = await api.getAllArtists();
+                    const currentCount = allArtists.filter(a => a.labelId === targetLabelId).length;
+                    if (currentCount >= targetLabel.maxArtists) {
+                        throw new Error(`Artist limit reached for this label (${targetLabel.maxArtists}).`);
+                    }
+                }
                 const result = await api.addArtist(artistData);
                 showToast(`New artist ${name} onboarded.`, 'success');
                 onSave(result);
@@ -131,110 +457,43 @@ const ArtistForm: React.FC<{
     );
 };
 
-const Artists: React.FC = () => {
-    const { user, showToast } = useContext(AppContext);
-    const [artists, setArtists] = useState<Artist[]>([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingArtist, setEditingArtist] = useState<Artist | null>(null);
-    const [newCredentials, setNewCredentials] = useState<User | null>(null);
-    const [justCreated, setJustCreated] = useState<Artist | null>(null);
-    const [filter, setFilter] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
-
-    // Pagination State
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 25;
-
-    // Delete Confirmation Modal State
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [artistToDelete, setArtistToDelete] = useState<Artist | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    
-    const fetchArtists = async () => {
-        setIsLoading(true);
-        try {
-            if (user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE) {
-                const data = await api.getAllArtists();
-                setArtists(Array.isArray(data) ? data : []);
-            } else if (user?.labelId) {
-                // api.getArtistsByLabel is now hierarchical
-                const data = await api.getArtistsByLabel(user.labelId);
-                setArtists(Array.isArray(data) ? data : []);
-            }
-        } catch (err: any) {
-            showToast('Failed to load artist catalog.', 'error');
-            setArtists([]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchArtists();
-    }, [user]);
-
-    // Reset pagination when search changes
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [filter]);
-
-    const handleArtistSaved = (result: {artist: Artist, user?: User}) => {
-        // Refresh the entire list from the server to ensure we have the correct data
-        fetchArtists();
-        
-        // Close modal and reset states
-        setIsModalOpen(false);
-        setEditingArtist(null);
-        setNewCredentials(null);
-        setJustCreated(null);
-        
-        if (!editingArtist && result.user) {
-            showToast(`Artist created. Password: ${result.user.password}`, 'success');
-        } else if (editingArtist) {
-            showToast(`Artist profile updated.`, 'success');
-        }
-    };
-
-    const handleOpenEdit = (artist: Artist) => {
-        setNewCredentials(null);
-        setJustCreated(null);
-        setEditingArtist(artist);
-        setIsModalOpen(true);
-    };
-
-    const handleOpenDelete = (artist: Artist) => {
-        setArtistToDelete(artist);
-        setIsDeleteModalOpen(true);
-    };
-
-    const confirmDelete = async () => {
-        if (!user || !artistToDelete) return;
-        setIsDeleting(true);
-        try {
-            await api.deleteArtist(artistToDelete.id, user);
-            showToast(`${artistToDelete.name} successfully removed from catalog.`, 'success');
-            setIsDeleteModalOpen(false);
-            setArtistToDelete(null);
-            await fetchArtists();
-        } catch (err: any) {
-            showToast(err.message || 'Deletion blocked by active releases.', 'error');
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
-    const filteredArtists = useMemo(() => {
-        return artists.filter(artist =>
-            (artist?.name?.toLowerCase() || '').includes(filter.toLowerCase()) ||
-            (artist?.type?.toLowerCase() || '').includes(filter.toLowerCase()) ||
-            (artist?.id && artist.id.toLowerCase().includes(filter.toLowerCase()))
-        ).sort((a, b) => (a?.name || '').localeCompare(b?.name || ''));
-    }, [artists, filter]);
-
-    const paginatedArtists = useMemo(() => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        return filteredArtists.slice(startIndex, startIndex + itemsPerPage);
-    }, [filteredArtists, currentPage]);
+// Original dark theme Artists view for partner users
+const PartnerArtistsView: React.FC<{
+    user: User | null;
+    artists: Artist[];
+    isLoading: boolean;
+    filter: string;
+    setFilter: (f: string) => void;
+    currentPage: number;
+    setCurrentPage: (n: number) => void;
+    filteredArtists: Artist[];
+    paginatedArtists: Artist[];
+    itemsPerPage: number;
+    isModalOpen: boolean;
+    setIsModalOpen: (open: boolean) => void;
+    editingArtist: Artist | null;
+    setEditingArtist: (a: Artist | null) => void;
+    newCredentials: User | null;
+    setNewCredentials: (u: User | null) => void;
+    justCreated: Artist | null;
+    setJustCreated: (a: Artist | null) => void;
+    isDeleteModalOpen: boolean;
+    setIsDeleteModalOpen: (open: boolean) => void;
+    artistToDelete: Artist | null;
+    isDeleting: boolean;
+    confirmDelete: () => void;
+    handleOpenEdit: (a: Artist) => void;
+    handleOpenDelete: (a: Artist) => void;
+    handleArtistSaved: (result: {artist: Artist, user?: User}) => void;
+    hierarchyLabels: Label[];
+}> = (props) => {
+    const {
+        user, artists, isLoading, filter, setFilter, currentPage, setCurrentPage,
+        filteredArtists, paginatedArtists, itemsPerPage, isModalOpen, setIsModalOpen,
+        editingArtist, setEditingArtist, newCredentials, setNewCredentials, justCreated, setJustCreated,
+        isDeleteModalOpen, setIsDeleteModalOpen, artistToDelete, isDeleting, confirmDelete,
+        handleOpenEdit, handleOpenDelete, handleArtistSaved, hierarchyLabels
+    } = props;
 
     return (
         <div className="animate-fade-in">
@@ -340,7 +599,7 @@ const Artists: React.FC = () => {
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={newCredentials || justCreated ? "Onboarding Result" : (editingArtist ? `Update Profile: ${editingArtist.name}` : "Initialize Artist Portal")} size="2xl">
                 {!newCredentials && !justCreated ? (
-                    <ArtistForm initialData={editingArtist || undefined} onClose={() => setIsModalOpen(false)} onSave={handleArtistSaved} />
+                    <PartnerArtistForm initialData={editingArtist || undefined} onClose={() => setIsModalOpen(false)} onSave={handleArtistSaved} hierarchyLabels={hierarchyLabels} user={user} />
                 ) : (
                     <div className="space-y-8 py-4">
                         <div className="p-8 bg-primary/10 border border-primary/20 rounded-[2rem] text-center">
@@ -365,7 +624,6 @@ const Artists: React.FC = () => {
                                     <span className="text-gray-600 text-[9px] font-black uppercase tracking-[0.3em]">Temporary Credential</span>
                                     <p className="text-primary text-2xl font-black tracking-widest bg-primary/5 px-4 py-2 rounded-xl border border-primary/10 inline-block">{newCredentials.password}</p>
                                 </div>
-                                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest pt-4 border-t border-white/5">Advise artist to reset credential upon first sync.</p>
                             </div>
                         )}
 
@@ -381,7 +639,7 @@ const Artists: React.FC = () => {
                     </div>
                     <h3 className="text-2xl font-black text-white mb-3 uppercase tracking-tight">Confirm Deletion</h3>
                     <p className="text-gray-500 font-medium max-w-xs mx-auto leading-relaxed mb-10">
-                        Profile for <span className="text-white font-bold">{artistToDelete?.name}</span> will be purged from the distribution archive. This action is irreversible.
+                        Profile for <span className="text-white font-bold">{artistToDelete?.name}</span> will be purged from the distribution archive.
                     </p>
                     <div className="flex gap-4">
                         <Button variant="secondary" className="flex-1 h-14 text-[10px] font-black uppercase tracking-widest" onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting}>Abort</Button>
@@ -393,6 +651,138 @@ const Artists: React.FC = () => {
             </Modal>
         </div>
     );
+};
+
+const Artists: React.FC = () => {
+    const { user, showToast } = useContext(AppContext);
+    const [artists, setArtists] = useState<Artist[]>([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingArtist, setEditingArtist] = useState<Artist | null>(null);
+    const [newCredentials, setNewCredentials] = useState<User | null>(null);
+    const [justCreated, setJustCreated] = useState<Artist | null>(null);
+    const [filter, setFilter] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [hierarchyLabels, setHierarchyLabels] = useState<Label[]>([]);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 25;
+
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [artistToDelete, setArtistToDelete] = useState<Artist | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const isPlatformSide = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
+    
+    const fetchArtists = async () => {
+        setIsLoading(true);
+        try {
+            if (user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE) {
+                const data = await api.getAllArtists();
+                setArtists(Array.isArray(data) ? data : []);
+            } else if (user?.labelId) {
+                const data = await api.getArtistsByLabel(user.labelId);
+                setArtists(Array.isArray(data) ? data : []);
+            }
+        } catch (err: any) {
+            showToast('Failed to load artist catalog.', 'error');
+            setArtists([]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchArtists();
+    }, [user]);
+
+    useEffect(() => {
+        const loadHierarchy = async () => {
+            if (user?.labelId) {
+                const subLabels = await api.getSubLabels(user.labelId);
+                const selfLabel = await api.getLabel(user.labelId);
+                setHierarchyLabels(selfLabel ? [selfLabel, ...subLabels] : subLabels);
+            } else if (user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE) {
+                const allLabels = await api.getLabels();
+                setHierarchyLabels(allLabels);
+            }
+        };
+        loadHierarchy();
+    }, [user]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filter]);
+
+    const handleArtistSaved = (result: {artist: Artist, user?: User}) => {
+        fetchArtists();
+        setIsModalOpen(false);
+        setEditingArtist(null);
+        setNewCredentials(null);
+        setJustCreated(null);
+        
+        if (!editingArtist && result.user) {
+            showToast(`Artist created. Password: ${result.user.password}`, 'success');
+        } else if (editingArtist) {
+            showToast(`Artist profile updated.`, 'success');
+        }
+    };
+
+    const handleOpenEdit = (artist: Artist) => {
+        setNewCredentials(null);
+        setJustCreated(null);
+        setEditingArtist(artist);
+        setIsModalOpen(true);
+    };
+
+    const handleOpenDelete = (artist: Artist) => {
+        if (window.confirm(`Are you sure you want to permanently delete artist "${artist.name}"?`)) {
+            setArtistToDelete(artist);
+            confirmDeleteDirect(artist.id, artist.name);
+        }
+    };
+
+    const confirmDeleteDirect = async (id: string, name: string) => {
+        if (!user) return;
+        setIsDeleting(true);
+        try {
+            await api.deleteArtist(id, user);
+            showToast(`${name} successfully removed from catalog.`, 'success');
+            await fetchArtists();
+        } catch (err: any) {
+            showToast(err.message || 'Deletion blocked by active releases.', 'error');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const filteredArtists = useMemo(() => {
+        return artists.filter(artist =>
+            (artist?.name?.toLowerCase() || '').includes(filter.toLowerCase()) ||
+            (artist?.type?.toLowerCase() || '').includes(filter.toLowerCase()) ||
+            (artist?.id && artist.id.toLowerCase().includes(filter.toLowerCase()))
+        ).sort((a, b) => (a?.name || '').localeCompare(b?.name || ''));
+    }, [artists, filter]);
+
+    const paginatedArtists = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredArtists.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredArtists, currentPage]);
+
+    const commonProps = {
+        user, artists, isLoading, filter, setFilter, currentPage, setCurrentPage,
+        filteredArtists, paginatedArtists, itemsPerPage, isModalOpen, setIsModalOpen,
+        editingArtist, setEditingArtist, newCredentials, setNewCredentials, justCreated, setJustCreated,
+        isDeleteModalOpen, setIsDeleteModalOpen, artistToDelete, isDeleting, confirmDelete: () => {},
+        handleOpenEdit, handleOpenDelete, handleArtistSaved, hierarchyLabels
+    };
+
+    // Use phpMyAdmin style for admin/employee users
+    if (isPlatformSide) {
+        return <PmaArtistsView {...commonProps} />;
+    }
+
+    // Use dark theme for partner users
+    return <PartnerArtistsView {...commonProps} />;
 };
 
 export default Artists;
