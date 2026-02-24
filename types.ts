@@ -194,6 +194,7 @@ export interface Release {
   description: string;
   explicit: boolean;
   tracks: Track[];
+  artists?: Artist[];
   createdAt: string;
   updatedAt: string;
   notes: InteractionNote[]; // Array of interaction history
