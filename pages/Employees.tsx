@@ -1,11 +1,10 @@
-
 import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { AppContext } from '../App';
 import { api } from '../services/mockApi';
 import { User, UserRole, UserPermissions, EMPLOYEE_DESIGNATIONS } from '../types';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Modal, Spinner, PageLoader, Pagination } from '../components/ui';
+import { PmaFieldset, PmaTable, PmaTR, PmaTD, PmaButton, PmaInput, PmaSelect, PmaStatusBadge, PmaPagination, PmaInfoBar } from '../components/PmaStyle';
 
-// Add missing canSubmitAlbums and canDeleteReleases to satisfy Record<keyof UserPermissions, ...>
 const PERMISSION_DESCRIPTIONS: Record<keyof UserPermissions, { title: string, subtitle: string }> = {
     canManageArtists: { title: "Artist Catalog", subtitle: "Manage artist profiles and logins" },
     canManageReleases: { title: "Distribution Queue", subtitle: "Review and approve incoming releases" },
@@ -18,168 +17,285 @@ const PERMISSION_DESCRIPTIONS: Record<keyof UserPermissions, { title: string, su
     canDeleteReleases: { title: "Hard Purge Authority", subtitle: "Permanently delete releases and binary assets" }
 };
 
-const Employees: React.FC = () => {
-    const { user: currentUser } = useContext(AppContext);
-    const [employees, setEmployees] = useState<User[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [newEmpInfo, setNewEmpInfo] = useState<User | null>(null);
+// phpMyAdmin style Employees view for admin users
+const PmaEmployeesView: React.FC<{
+    currentUser: User | null;
+    employees: User[];
+    isLoading: boolean;
+    isModalOpen: boolean;
+    setIsModalOpen: (open: boolean) => void;
+    newEmpInfo: User | null;
+    setNewEmpInfo: (u: User | null) => void;
+    filterQuery: string;
+    setFilterQuery: (q: string) => void;
+    filterDesignation: string;
+    setFilterDesignation: (d: string) => void;
+    currentPage: number;
+    setCurrentPage: (p: number) => void;
+    filteredEmployees: User[];
+    paginatedEmployees: User[];
+    itemsPerPage: number;
+    editingUserId: string | null;
+    newName: string;
+    setNewName: (n: string) => void;
+    newEmail: string;
+    setNewEmail: (e: string) => void;
+    designation: string;
+    setDesignation: (d: string) => void;
+    permissions: UserPermissions;
+    setPermissions: (p: UserPermissions) => void;
+    handleSave: (e: React.FormEvent) => void;
+    handleDelete: (emp: User) => void;
+    handleOpenEdit: (emp: User) => void;
+    handleOpenCreate: () => void;
+    getDesignationRank: (d?: string) => number;
+    myRank: number;
+}> = (props) => {
+    const {
+        currentUser, employees, isLoading, isModalOpen, setIsModalOpen, newEmpInfo, setNewEmpInfo,
+        filterQuery, setFilterQuery, filterDesignation, setFilterDesignation,
+        currentPage, setCurrentPage, filteredEmployees, paginatedEmployees, itemsPerPage,
+        editingUserId, newName, setNewName, newEmail, setNewEmail, designation, setDesignation,
+        permissions, setPermissions, handleSave, handleDelete, handleOpenEdit, handleOpenCreate,
+        getDesignationRank, myRank
+    } = props;
 
-    // Filter State
-    const [filterQuery, setFilterQuery] = useState('');
-    const [filterDesignation, setFilterDesignation] = useState('ALL');
+    return (
+        <div className="space-y-4">
+            <PmaInfoBar>
+                <strong>Table:</strong> employees &nbsp;|&nbsp; 
+                <strong>Records:</strong> {filteredEmployees.length} &nbsp;|&nbsp;
+                <span className="text-[#009900]">● Active</span>
+            </PmaInfoBar>
 
-    // Pagination State
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 25;
+            <PmaFieldset legend="Corporate Personnel - Staff Management">
+                <div className="p-4">
+                    {/* Actions */}
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-[#666]">Search:</span>
+                                <input
+                                    type="text"
+                                    value={filterQuery}
+                                    onChange={e => setFilterQuery(e.target.value)}
+                                    placeholder="Filter by name, email..."
+                                    className="border-2 border-[#ccc] px-3 py-1.5 text-sm w-48 focus:border-[#0066cc] outline-none"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-[#666]">Designation:</span>
+                                <select
+                                    value={filterDesignation}
+                                    onChange={e => setFilterDesignation(e.target.value)}
+                                    className="border-2 border-[#ccc] px-3 py-1.5 text-sm focus:border-[#0066cc] outline-none"
+                                >
+                                    <option value="ALL">All Roles</option>
+                                    {EMPLOYEE_DESIGNATIONS.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <PmaButton variant="primary" onClick={handleOpenCreate}>
+                            + Add Employee
+                        </PmaButton>
+                    </div>
 
-    // Form State
-    const [editingUserId, setEditingUserId] = useState<string | null>(null);
-    const [newName, setNewName] = useState('');
-    const [newEmail, setNewEmail] = useState('');
-    const [designation, setDesignation] = useState<string>(EMPLOYEE_DESIGNATIONS[0]);
-    const [permissions, setPermissions] = useState<UserPermissions>({
-        canManageArtists: true,
-        canManageReleases: true,
-        canViewFinancials: false,
-        canCreateSubLabels: false,
-        canManageEmployees: false,
-        canManageNetwork: false,
-        canOnboardLabels: false,
-        canDeleteReleases: false
-    });
+                    {/* Table */}
+                    <PmaTable
+                        headers={[
+                            { label: 'Name' },
+                            { label: 'Email' },
+                            { label: 'Designation' },
+                            { label: 'Permissions' },
+                            { label: 'Actions', className: 'text-center' }
+                        ]}
+                    >
+                        {paginatedEmployees.map(emp => {
+                            const empRank = getDesignationRank(emp.designation);
+                            const canManage = currentUser?.role === UserRole.OWNER || myRank < empRank;
+                            const permCount = Object.entries(emp.permissions).filter(([_, val]) => val).length;
 
-    const fetchEmployees = async () => {
-        if (currentUser) {
-            setIsLoading(true);
-            try {
-                const emps = await api.getEmployees(currentUser);
-                setEmployees(emps);
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setIsLoading(false);
-            }
-        }
-    };
+                            return (
+                                <PmaTR key={emp.id}>
+                                    <PmaTD isLabel className="text-black">{emp.name}</PmaTD>
+                                    <PmaTD className="font-mono text-xs text-black">{emp.email}</PmaTD>
+                                    <PmaTD>
+                                        <span className="text-xs bg-[#f0f0f0] px-2 py-1 border border-[#ccc] text-black">
+                                            {emp.designation || 'N/A'}
+                                        </span>
+                                    </PmaTD>
+                                    <PmaTD>
+                                        <span className="text-xs text-black">{permCount} permissions granted</span>
+                                    </PmaTD>
+                                    <PmaTD className="text-center">
+                                        {canManage && (
+                                            <div className="flex justify-center gap-2">
+                                                <button onClick={() => handleOpenEdit(emp)} className="text-[#0066cc] hover:underline text-xs">Edit</button>
+                                                <button onClick={() => handleDelete(emp)} className="text-[#cc0000] hover:underline text-xs">Delete</button>
+                                            </div>
+                                        )}
+                                    </PmaTD>
+                                </PmaTR>
+                            );
+                        })}
+                        {paginatedEmployees.length === 0 && (
+                            <PmaTR>
+                                <PmaTD colSpan={5} className="text-center py-8 text-[#999]">
+                                    No employees found
+                                </PmaTD>
+                            </PmaTR>
+                        )}
+                    </PmaTable>
 
-    useEffect(() => {
-        fetchEmployees();
-    }, [currentUser]);
+                    {/* Pagination */}
+                    <PmaPagination
+                        totalItems={filteredEmployees.length}
+                        itemsPerPage={itemsPerPage}
+                        currentPage={currentPage}
+                        onPageChange={setCurrentPage}
+                    />
+                </div>
+            </PmaFieldset>
 
-    // Reset pagination
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [filterQuery, filterDesignation]);
+            {/* Modal */}
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingUserId ? "Edit Employee" : "Add New Employee"} size="2xl">
+                {!newEmpInfo ? (
+                    <form onSubmit={handleSave} className="p-4 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-black mb-1">Full Name</label>
+                                <input
+                                    type="text"
+                                    value={newName}
+                                    onChange={e => setNewName(e.target.value)}
+                                    required
+                                    className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-black mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    value={newEmail}
+                                    onChange={e => setNewEmail(e.target.value)}
+                                    required
+                                    className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                                />
+                            </div>
+                        </div>
 
-    const getDesignationRank = (d?: string) => {
-        if (!d) return 999;
-        return EMPLOYEE_DESIGNATIONS.indexOf(d as any);
-    };
+                        <div>
+                            <label className="block text-xs font-bold text-black mb-1">Designation</label>
+                            <select
+                                value={designation}
+                                onChange={e => setDesignation(e.target.value)}
+                                className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                            >
+                                {EMPLOYEE_DESIGNATIONS.map(d => {
+                                    const rank = getDesignationRank(d);
+                                    const disabled = currentUser?.role !== UserRole.OWNER && rank <= myRank;
+                                    return <option key={d} value={d} disabled={disabled}>{d}</option>;
+                                })}
+                            </select>
+                        </div>
 
-    const handleSave = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!currentUser) return;
-        setIsLoading(true);
-        try {
-            if (editingUserId) {
-                const updated = await api.updateEmployee(editingUserId, {
-                    name: newName,
-                    email: newEmail,
-                    designation,
-                    permissions
-                }, currentUser);
-                setEmployees(prev => prev.map(emp => emp.id === editingUserId ? updated : emp));
-                setIsModalOpen(false);
-            } else {
-                const result = await api.addEmployee({
-                    name: newName,
-                    email: newEmail,
-                    designation: designation,
-                    permissions
-                }, currentUser);
-                setNewEmpInfo(result);
-                setEmployees(prev => [...prev, result]);
-            }
-        } catch (error: any) {
-            alert(error.message || 'Error processing staff update');
-        } finally {
-            setIsLoading(false);
-        }
-    };
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-bold text-black uppercase border-b border-[#ccc] pb-2">Administrative Privileges</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {Object.keys(PERMISSION_DESCRIPTIONS).map(key => {
+                                    const { title, subtitle } = PERMISSION_DESCRIPTIONS[key as keyof UserPermissions];
+                                    return (
+                                        <label key={key} className="flex items-center justify-between border border-[#ccc] p-3 hover:bg-[#f5f5f5] cursor-pointer">
+                                            <div>
+                                                <span className="text-sm font-medium text-black">{title}</span>
+                                                <span className="block text-xs text-[#444]">{subtitle}</span>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={(permissions as any)[key]}
+                                                onChange={e => setPermissions(prev => ({ ...prev, [key]: e.target.checked }))}
+                                                className="w-5 h-5"
+                                            />
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
 
-    const handleDelete = async (emp: User) => {
-        if (!currentUser) return;
-        if (window.confirm(`Are you sure you want to terminate ${emp.name}? This cannot be undone.`)) {
-            setIsLoading(true);
-            try {
-                await api.deleteEmployee(emp.id, currentUser);
-                await fetchEmployees();
-            } catch (e: any) {
-                alert(e.message || 'Termination failed');
-                setIsLoading(false);
-            }
-        }
-    };
+                        <div className="flex justify-end gap-2 pt-4 border-t border-[#ccc]">
+                            <PmaButton variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</PmaButton>
+                            <PmaButton variant="primary" onClick={handleSave} disabled={isLoading}>
+                                {isLoading ? 'Saving...' : (editingUserId ? 'Update' : 'Create')}
+                            </PmaButton>
+                        </div>
+                    </form>
+                ) : (
+                    <div className="p-4 space-y-4">
+                        <div className="bg-[#e8f4e8] border border-[#009900] p-4">
+                            <p className="text-[#009900] font-bold">Access Token Generated</p>
+                        </div>
+                        <div className="border-2 border-[#ccc] p-4 space-y-3">
+                            <div>
+                                <span className="text-xs text-[#666]">Auth Point</span>
+                                <p className="font-medium">{newEmpInfo.email}</p>
+                            </div>
+                            <div>
+                                <span className="text-xs text-[#666]">One-Time Key</span>
+                                <p className="font-mono text-lg bg-[#f5f5f5] px-3 py-2 border border-[#ccc] inline-block">{newEmpInfo.password}</p>
+                            </div>
+                        </div>
+                        <PmaButton variant="primary" onClick={() => { setIsModalOpen(false); setNewEmpInfo(null); }} className="w-full">
+                            Close
+                        </PmaButton>
+                    </div>
+                )}
+            </Modal>
+        </div>
+    );
+};
 
-    const handleOpenEdit = (emp: User) => {
-        setEditingUserId(emp.id);
-        setNewName(emp.name);
-        setNewEmail(emp.email);
-        setDesignation(emp.designation || EMPLOYEE_DESIGNATIONS[0]);
-        setPermissions({
-            canManageArtists: emp.permissions.canManageArtists || false,
-            canManageReleases: emp.permissions.canManageReleases || false,
-            canCreateSubLabels: emp.permissions.canCreateSubLabels || false,
-            canManageEmployees: emp.permissions.canManageEmployees || false,
-            canManageNetwork: emp.permissions.canManageNetwork || false,
-            canViewFinancials: emp.permissions.canViewFinancials || false,
-            canOnboardLabels: emp.permissions.canOnboardLabels || false,
-            canDeleteReleases: emp.permissions.canDeleteReleases || false,
-            canSubmitAlbums: emp.permissions.canSubmitAlbums || false
-        });
-        setNewEmpInfo(null);
-        setIsModalOpen(true);
-    };
-
-    const handleOpenCreate = () => {
-        setEditingUserId(null);
-        setNewName('');
-        setNewEmail('');
-        setDesignation(EMPLOYEE_DESIGNATIONS[0]);
-        setPermissions({
-            canManageArtists: true,
-            canManageReleases: true,
-            canViewFinancials: false,
-            canCreateSubLabels: false,
-            canManageEmployees: false,
-            canManageNetwork: false,
-            canOnboardLabels: false,
-            canDeleteReleases: false,
-            canSubmitAlbums: true
-        });
-        setNewEmpInfo(null);
-        setIsModalOpen(true);
-    };
-
-    const filteredEmployees = useMemo(() => {
-        return employees.filter(emp => {
-            const matchesSearch = emp.name.toLowerCase().includes(filterQuery.toLowerCase()) || 
-                                  emp.email.toLowerCase().includes(filterQuery.toLowerCase()) ||
-                                  (emp.designation && emp.designation.toLowerCase().includes(filterQuery.toLowerCase()));
-            const matchesDesignation = filterDesignation === 'ALL' || emp.designation === filterDesignation;
-            return matchesSearch && matchesDesignation;
-        });
-    }, [employees, filterQuery, filterDesignation]);
-
-    const paginatedEmployees = useMemo(() => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        return filteredEmployees.slice(startIndex, startIndex + itemsPerPage);
-    }, [filteredEmployees, currentPage]);
-
-    if (isLoading && employees.length === 0) return <PageLoader />;
-
-    const myRank = getDesignationRank(currentUser?.designation);
+// Original dark theme view (kept for reference, but Employees is admin-only)
+const PartnerEmployeesView: React.FC<{
+    currentUser: User | null;
+    employees: User[];
+    isLoading: boolean;
+    isModalOpen: boolean;
+    setIsModalOpen: (open: boolean) => void;
+    newEmpInfo: User | null;
+    setNewEmpInfo: (u: User | null) => void;
+    filterQuery: string;
+    setFilterQuery: (q: string) => void;
+    filterDesignation: string;
+    setFilterDesignation: (d: string) => void;
+    currentPage: number;
+    setCurrentPage: (p: number) => void;
+    filteredEmployees: User[];
+    paginatedEmployees: User[];
+    itemsPerPage: number;
+    editingUserId: string | null;
+    newName: string;
+    setNewName: (n: string) => void;
+    newEmail: string;
+    setNewEmail: (e: string) => void;
+    designation: string;
+    setDesignation: (d: string) => void;
+    permissions: UserPermissions;
+    setPermissions: (p: UserPermissions) => void;
+    handleSave: (e: React.FormEvent) => void;
+    handleDelete: (emp: User) => void;
+    handleOpenEdit: (emp: User) => void;
+    handleOpenCreate: () => void;
+    getDesignationRank: (d?: string) => number;
+    myRank: number;
+}> = (props) => {
+    const {
+        currentUser, employees, isLoading, isModalOpen, setIsModalOpen, newEmpInfo, setNewEmpInfo,
+        filterQuery, setFilterQuery, filterDesignation, setFilterDesignation,
+        currentPage, setCurrentPage, filteredEmployees, paginatedEmployees, itemsPerPage,
+        editingUserId, newName, setNewName, newEmail, setNewEmail, designation, setDesignation,
+        permissions, setPermissions, handleSave, handleDelete, handleOpenEdit, handleOpenCreate,
+        getDesignationRank, myRank
+    } = props;
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -354,6 +470,184 @@ const Employees: React.FC = () => {
             </Modal>
         </div>
     );
+};
+
+const Employees: React.FC = () => {
+    const { user: currentUser } = useContext(AppContext);
+    const [employees, setEmployees] = useState<User[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [newEmpInfo, setNewEmpInfo] = useState<User | null>(null);
+
+    const [filterQuery, setFilterQuery] = useState('');
+    const [filterDesignation, setFilterDesignation] = useState('ALL');
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 25;
+
+    const [editingUserId, setEditingUserId] = useState<string | null>(null);
+    const [newName, setNewName] = useState('');
+    const [newEmail, setNewEmail] = useState('');
+    const [designation, setDesignation] = useState<string>(EMPLOYEE_DESIGNATIONS[0]);
+    const [permissions, setPermissions] = useState<UserPermissions>({
+        canManageArtists: true,
+        canManageReleases: true,
+        canViewFinancials: false,
+        canCreateSubLabels: false,
+        canManageEmployees: false,
+        canManageNetwork: false,
+        canOnboardLabels: false,
+        canDeleteReleases: false
+    });
+
+    const fetchEmployees = async () => {
+        if (currentUser) {
+            setIsLoading(true);
+            try {
+                const emps = await api.getEmployees(currentUser);
+                setEmployees(emps);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+    };
+
+    useEffect(() => {
+        fetchEmployees();
+    }, [currentUser]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filterQuery, filterDesignation]);
+
+    const getDesignationRank = (d?: string) => {
+        if (!d) return 999;
+        return EMPLOYEE_DESIGNATIONS.indexOf(d as any);
+    };
+
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!currentUser) return;
+        setIsLoading(true);
+        try {
+            if (editingUserId) {
+                const updated = await api.updateEmployee(editingUserId, {
+                    name: newName,
+                    email: newEmail,
+                    designation,
+                    permissions
+                });
+                setEmployees(prev => prev.map(emp => emp.id === editingUserId ? updated : emp));
+                setIsModalOpen(false);
+            } else {
+                const result = await api.addEmployee({
+                    name: newName,
+                    email: newEmail,
+                    designation: designation,
+                    permissions
+                });
+                setNewEmpInfo(result);
+                setEmployees(prev => [...prev, result]);
+            }
+        } catch (error: any) {
+            alert(error.message || 'Error processing staff update');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleDelete = async (emp: User) => {
+        if (!currentUser) return;
+        if (window.confirm(`Are you sure you want to terminate ${emp.name}? This cannot be undone.`)) {
+            setIsLoading(true);
+            try {
+                await api.deleteEmployee(emp.id, currentUser);
+                await fetchEmployees();
+            } catch (e: any) {
+                alert(e.message || 'Termination failed');
+                setIsLoading(false);
+            }
+        }
+    };
+
+    const handleOpenEdit = (emp: User) => {
+        setEditingUserId(emp.id);
+        setNewName(emp.name);
+        setNewEmail(emp.email);
+        setDesignation(emp.designation || EMPLOYEE_DESIGNATIONS[0]);
+        setPermissions({
+            canManageArtists: emp.permissions.canManageArtists || false,
+            canManageReleases: emp.permissions.canManageReleases || false,
+            canCreateSubLabels: emp.permissions.canCreateSubLabels || false,
+            canManageEmployees: emp.permissions.canManageEmployees || false,
+            canManageNetwork: emp.permissions.canManageNetwork || false,
+            canViewFinancials: emp.permissions.canViewFinancials || false,
+            canOnboardLabels: emp.permissions.canOnboardLabels || false,
+            canDeleteReleases: emp.permissions.canDeleteReleases || false,
+            canSubmitAlbums: emp.permissions.canSubmitAlbums || false
+        });
+        setNewEmpInfo(null);
+        setIsModalOpen(true);
+    };
+
+    const handleOpenCreate = () => {
+        setEditingUserId(null);
+        setNewName('');
+        setNewEmail('');
+        setDesignation(EMPLOYEE_DESIGNATIONS[0]);
+        setPermissions({
+            canManageArtists: true,
+            canManageReleases: true,
+            canViewFinancials: false,
+            canCreateSubLabels: false,
+            canManageEmployees: false,
+            canManageNetwork: false,
+            canOnboardLabels: false,
+            canDeleteReleases: false,
+            canSubmitAlbums: true
+        });
+        setNewEmpInfo(null);
+        setIsModalOpen(true);
+    };
+
+    const filteredEmployees = useMemo(() => {
+        return employees.filter(emp => {
+            const matchesSearch = emp.name.toLowerCase().includes(filterQuery.toLowerCase()) || 
+                                  emp.email.toLowerCase().includes(filterQuery.toLowerCase()) ||
+                                  (emp.designation && emp.designation.toLowerCase().includes(filterQuery.toLowerCase()));
+            const matchesDesignation = filterDesignation === 'ALL' || emp.designation === filterDesignation;
+            return matchesSearch && matchesDesignation;
+        });
+    }, [employees, filterQuery, filterDesignation]);
+
+    const paginatedEmployees = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredEmployees.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredEmployees, currentPage]);
+
+    if (isLoading && employees.length === 0) return <PageLoader />;
+
+    const myRank = getDesignationRank(currentUser?.designation);
+    const isPlatformSide = currentUser?.role === UserRole.OWNER || currentUser?.role === UserRole.EMPLOYEE;
+
+    const commonProps = {
+        currentUser, employees, isLoading, isModalOpen, setIsModalOpen, newEmpInfo, setNewEmpInfo,
+        filterQuery, setFilterQuery, filterDesignation, setFilterDesignation,
+        currentPage, setCurrentPage, filteredEmployees, paginatedEmployees, itemsPerPage,
+        editingUserId, newName, setNewName, newEmail, setNewEmail, designation, setDesignation,
+        permissions, setPermissions, handleSave, handleDelete, handleOpenEdit, handleOpenCreate,
+        getDesignationRank, myRank
+    };
+
+    // Use phpMyAdmin style for admin/employee users
+    if (isPlatformSide) {
+        return <PmaEmployeesView {...commonProps} />;
+    }
+
+    // Fallback to dark theme (shouldn't normally reach here for Employees page)
+    return <PartnerEmployeesView {...commonProps} />;
 };
 
 export default Employees;

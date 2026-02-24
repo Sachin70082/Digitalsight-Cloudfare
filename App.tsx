@@ -30,6 +30,8 @@ type AppContextType = {
   login: (email: string, password?: string, turnstileToken?: string) => Promise<void>;
   logout: () => void;
   showToast: (message: string, type?: ToastType) => void;
+  fontSize: number;
+  setFontSize: (size: number) => void;
 };
 
 export const AppContext = createContext<AppContextType>({
@@ -37,6 +39,8 @@ export const AppContext = createContext<AppContextType>({
   login: async () => {},
   logout: () => {},
   showToast: () => {},
+  fontSize: 100,
+  setFontSize: () => {},
 });
 
 const Toast: React.FC<{ message: string; type: ToastType; onClear: () => void }> = ({ message, type, onClear }) => {
@@ -68,6 +72,15 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const [fontSize, setFontSize] = useState(() => {
+    const saved = localStorage.getItem('app-font-size');
+    return saved ? parseInt(saved, 10) : 100;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('app-font-size', fontSize.toString());
+    document.documentElement.style.fontSize = `${fontSize}%`;
+  }, [fontSize]);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -100,7 +113,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <AppContext.Provider value={{ user, login, logout, showToast }}>
+    <AppContext.Provider value={{ user, login, logout, showToast, fontSize, setFontSize }}>
       <BrowserRouter>
         {toast && <Toast message={toast.message} type={toast.type} onClear={() => setToast(null)} />}
         <Suspense fallback={<div className="bg-gray-900 h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>}>

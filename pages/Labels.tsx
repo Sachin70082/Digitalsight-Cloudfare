@@ -1,299 +1,468 @@
-
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { AppContext } from '../App';
 import { api } from '../services/mockApi';
 import { Label, User, UserRole, UserPermissions } from '../types';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Modal, Spinner, PageLoader, Pagination, Skeleton } from '../components/ui';
 import { TrashIcon } from '../components/Icons';
+import { PmaFieldset, PmaTable, PmaTR, PmaTD, PmaButton, PmaInput, PmaSelect, PmaStatusBadge, PmaPagination, PmaInfoBar } from '../components/PmaStyle';
 
-const Labels: React.FC = () => {
-    const { user: currentUser, showToast } = useContext(AppContext);
-    const [labels, setLabels] = useState<Label[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [step, setStep] = useState(1);
-    const [filter, setFilter] = useState('');
-    
-    // Deletion State
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [labelToDelete, setLabelToDelete] = useState<Label | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
+// phpMyAdmin style Labels page for admin users
+const PmaLabelsView: React.FC<{
+    currentUser: any;
+    labels: Label[];
+    isLoading: boolean;
+    filter: string;
+    setFilter: (f: string) => void;
+    blockedStatus: Record<string, boolean>;
+    canManage: boolean;
+    onOpenCreate: () => void;
+    onOpenEdit: (label: Label) => void;
+    onOpenDelete: (label: Label) => void;
+    onOpenBlock: (label: Label) => void;
+    currentPage: number;
+    setCurrentPage: (n: number) => void;
+    filteredLabels: Label[];
+    paginatedLabels: Label[];
+    itemsPerPage: number;
+    // Modal props
+    isModalOpen: boolean;
+    setIsModalOpen: (open: boolean) => void;
+    step: number;
+    setStep: (n: number) => void;
+    formData: any;
+    setFormData: (d: any) => void;
+    permissions: UserPermissions;
+    setPermissions: (p: UserPermissions) => void;
+    editingLabelId: string | null;
+    createdResult: {label: Label, user: User} | null;
+    executeSync: () => void;
+    handleSendResetEmail: () => void;
+    isDeleteModalOpen: boolean;
+    setIsDeleteModalOpen: (open: boolean) => void;
+    labelToDelete: Label | null;
+    isDeleting: boolean;
+    confirmDelete: () => void;
+    isBlockModalOpen: boolean;
+    setIsBlockModalOpen: (open: boolean) => void;
+    labelToBlock: Label | null;
+    blockReason: string;
+    setBlockReason: (r: string) => void;
+    isBlocking: boolean;
+    confirmBlock: () => void;
+}> = (props) => {
+    const {
+        currentUser, labels, isLoading, filter, setFilter, blockedStatus, canManage,
+        onOpenCreate, onOpenEdit, onOpenDelete, onOpenBlock,
+        currentPage, setCurrentPage, filteredLabels, paginatedLabels, itemsPerPage,
+        isModalOpen, setIsModalOpen, step, setStep, formData, setFormData,
+        permissions, setPermissions, editingLabelId, createdResult, executeSync,
+        handleSendResetEmail, isDeleteModalOpen, setIsDeleteModalOpen, labelToDelete,
+        isDeleting, confirmDelete, isBlockModalOpen, setIsBlockModalOpen, labelToBlock,
+        blockReason, setBlockReason, isBlocking, confirmBlock
+    } = props;
 
-    // Blocking State
-    const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
-    const [labelToBlock, setLabelToBlock] = useState<Label | null>(null);
-    const [blockReason, setBlockReason] = useState('');
-    const [isBlocking, setIsBlocking] = useState(false);
-    const [blockedStatus, setBlockedStatus] = useState<Record<string, boolean>>({});
+    return (
+        <div className="space-y-4">
+            <PmaInfoBar>
+                <strong>Database:</strong> partner_labels &nbsp;|&nbsp; 
+                <strong>Records:</strong> {labels.length} &nbsp;|&nbsp;
+                <strong>Active:</strong> {labels.filter(l => !blockedStatus[l.id]).length}
+            </PmaInfoBar>
 
-    // Editing State
-    const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+            <PmaFieldset legend="Partner Labels">
+                <div className="p-4">
+                    {/* Filters */}
+                    <div className="flex flex-wrap gap-3 items-end mb-4">
+                        <PmaInput
+                            label="Search"
+                            value={filter}
+                            onChange={setFilter}
+                            placeholder="Search name, ID or region..."
+                            className="flex-1 min-w-[200px]"
+                        />
+                        {canManage && (
+                            <PmaButton variant="primary" onClick={onOpenCreate}>
+                                + Create Label
+                            </PmaButton>
+                        )}
+                    </div>
 
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 25;
+                    {/* Results count */}
+                    <div className="text-xs text-[#666] mb-2">
+                        Showing {paginatedLabels.length} of {filteredLabels.length} records
+                    </div>
 
-    const [createdResult, setCreatedResult] = useState<{label: Label, user: User} | null>(null);
+                    {/* Table */}
+                    <PmaTable
+                        headers={[
+                            { label: 'Name' },
+                            { label: 'ID' },
+                            { label: 'Region' },
+                            { label: 'Revenue Share', className: 'text-center' },
+                            { label: 'Status', className: 'text-center' },
+                            { label: 'Actions', className: 'text-center' }
+                        ]}
+                    >
+                        {isLoading ? (
+                            [...Array(5)].map((_, i) => (
+                                <PmaTR key={i}>
+                                    <PmaTD>Loading...</PmaTD>
+                                    <PmaTD>...</PmaTD>
+                                    <PmaTD>...</PmaTD>
+                                    <PmaTD className="text-center">...</PmaTD>
+                                    <PmaTD className="text-center">...</PmaTD>
+                                    <PmaTD className="text-center">...</PmaTD>
+                                </PmaTR>
+                            ))
+                        ) : paginatedLabels.length === 0 ? (
+                            <PmaTR>
+                                <PmaTD colSpan={6} className="text-center py-8 text-[#999]">
+                                    No records found
+                                </PmaTD>
+                            </PmaTR>
+                        ) : paginatedLabels.map(label => (
+                            <PmaTR key={label.id}>
+                                <PmaTD isLabel>
+                                    <span className="font-medium text-black">{label.name}</span>
+                                </PmaTD>
+                                <PmaTD>
+                                    <span className="font-mono text-xs text-black">{label.id?.toUpperCase() || 'N/A'}</span>
+                                </PmaTD>
+                                <PmaTD className="text-black">{label.country || 'Global'}</PmaTD>
+                                <PmaTD className="text-center">
+                                    <span className="font-bold text-[#0066cc]">{label.revenueShare || 70}%</span>
+                                </PmaTD>
+                                <PmaTD className="text-center">
+                                    <PmaStatusBadge status={blockedStatus[label.id] ? 'Suspended' : 'Active'} />
+                                </PmaTD>
+                                <PmaTD className="text-center">
+                                    <div className="flex justify-center gap-2">
+                                        {canManage && (
+                                            <>
+                                                <button onClick={() => onOpenEdit(label)} className="text-[#0066cc] hover:underline text-xs">Edit</button>
+                                                <button onClick={() => onOpenBlock(label)} className={`${blockedStatus[label.id] ? 'text-[#009900]' : 'text-[#cc6600]'} hover:underline text-xs`}>
+                                                    {blockedStatus[label.id] ? 'Unblock' : 'Block'}
+                                                </button>
+                                                <button onClick={() => onOpenDelete(label)} className="text-[#cc0000] hover:underline text-xs">Delete</button>
+                                            </>
+                                        )}
+                                    </div>
+                                </PmaTD>
+                            </PmaTR>
+                        ))}
+                    </PmaTable>
 
-    const [formData, setFormData] = useState({
-        name: '',
-        adminName: '',
-        adminEmail: '',
-        adminPassword: '',
-        address: '',
-        city: '',
-        country: '',
-        taxId: '',
-        website: '',
-        phone: '',
-        revenueShare: 70,
-        maxArtists: 10,
-        parentLabelId: ''
-    });
+                    <PmaPagination
+                        currentPage={currentPage}
+                        totalItems={filteredLabels.length}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                    />
+                </div>
+            </PmaFieldset>
 
-    const [permissions, setPermissions] = useState<UserPermissions>({
-        canManageArtists: true,
-        canManageReleases: true,
-        canCreateSubLabels: true,
-        canSubmitAlbums: true
-    });
+            {/* Create/Edit Modal - phpMyAdmin Style */}
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={createdResult ? "Label Created" : (editingLabelId ? "Edit Label" : "Create New Label")} size="2xl">
+                {!createdResult ? (
+                    <form onSubmit={(e) => e.preventDefault()} className="p-4 space-y-4">
+                        {/* Step indicator */}
+                        <div className="flex items-center gap-2 mb-6 border-b border-[#ccc] pb-4">
+                            {['Auth', 'Business', 'Rights'].map((n, i) => (
+                                <div key={n} className="flex items-center">
+                                    <div className={`w-8 h-8 rounded flex items-center justify-center text-xs font-bold ${step > i + 1 ? 'bg-[#009900] text-white' : (step === i + 1 ? 'bg-[#0066cc] text-white' : 'bg-[#f0f0f0] text-[#666] border border-[#ccc]')}`}>
+                                        {step > i + 1 ? '✓' : i + 1}
+                                    </div>
+                                    <span className={`ml-2 text-xs font-bold ${step === i + 1 ? 'text-[#333]' : 'text-[#999]'}`}>{n}</span>
+                                    {i < 2 && <div className={`w-12 h-0.5 mx-4 ${step > i + 1 ? 'bg-[#009900]' : 'bg-[#ccc]'}`} />}
+                                </div>
+                            ))}
+                        </div>
 
-    const fetchLabels = async () => {
-        setIsLoading(true);
-        try {
-            const data = await api.getLabels();
-            setLabels(data);
-        } catch (e) {
-            showToast('Failed to load partners.', 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    };
+                        {step === 1 && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-black mb-1">Label Name</label>
+                                        <input
+                                            type="text"
+                                            value={formData.name}
+                                            onChange={e => setFormData({...formData, name: e.target.value})}
+                                            required
+                                            className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-black mb-1">Admin Name</label>
+                                        <input
+                                            type="text"
+                                            value={formData.adminName}
+                                            onChange={e => setFormData({...formData, adminName: e.target.value})}
+                                            required
+                                            className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-black mb-1">Admin Email</label>
+                                        <input
+                                            type="email"
+                                            value={formData.adminEmail}
+                                            onChange={e => setFormData({...formData, adminEmail: e.target.value})}
+                                            required
+                                            disabled={!!editingLabelId}
+                                            className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none disabled:bg-[#f5f5f5] text-black"
+                                        />
+                                    </div>
+                                    {!editingLabelId && (
+                                        <div>
+                                            <label className="block text-xs font-bold text-black mb-1">Initial Password</label>
+                                            <input
+                                                type="text"
+                                                value={formData.adminPassword}
+                                                onChange={e => setFormData({...formData, adminPassword: e.target.value})}
+                                                placeholder="Auto-generated if blank"
+                                                className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                                {editingLabelId && (
+                                    <div className="bg-[#fff3cd] border border-[#856404] p-3 flex justify-between items-center">
+                                        <span className="text-sm text-[#856404]">Send password reset link to admin</span>
+                                        <PmaButton variant="secondary" onClick={handleSendResetEmail} disabled={isLoading}>
+                                            Send Reset Link
+                                        </PmaButton>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
-    useEffect(() => {
-        if (currentUser?.role === UserRole.OWNER || currentUser?.permissions?.canOnboardLabels) {
-            fetchLabels();
-        }
-    }, [currentUser]);
+                        {step === 2 && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-black mb-1">Tax ID</label>
+                                        <input
+                                            type="text"
+                                            value={formData.taxId}
+                                            onChange={e => setFormData({...formData, taxId: e.target.value})}
+                                            className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-black mb-1">Phone</label>
+                                        <input
+                                            type="text"
+                                            value={formData.phone}
+                                            onChange={e => setFormData({...formData, phone: e.target.value})}
+                                            className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-black mb-1">Revenue Share (%)</label>
+                                        <input
+                                            type="number"
+                                            value={formData.revenueShare}
+                                            onChange={e => setFormData({...formData, revenueShare: parseInt(e.target.value)})}
+                                            className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-black mb-1">Country</label>
+                                        <input
+                                            type="text"
+                                            value={formData.country}
+                                            onChange={e => setFormData({...formData, country: e.target.value})}
+                                            className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-black mb-1">Website</label>
+                                        <input
+                                            type="text"
+                                            value={formData.website}
+                                            onChange={e => setFormData({...formData, website: e.target.value})}
+                                            className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-black mb-1">Address</label>
+                                    <input
+                                        type="text"
+                                        value={formData.address}
+                                        onChange={e => setFormData({...formData, address: e.target.value})}
+                                        className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none text-black"
+                                    />
+                                </div>
+                            </div>
+                        )}
 
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [filter]);
+                        {step === 3 && (
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-bold text-black uppercase border-b border-[#ccc] pb-2">Permissions</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {Object.keys(permissions).map(key => (
+                                        <label key={key} className="flex items-center justify-between border border-[#ccc] p-3 hover:bg-[#f5f5f5] cursor-pointer">
+                                            <span className="text-sm text-black">
+                                                {key === 'canSubmitAlbums' ? 'Album Submission' : key.replace('can', '').replace(/([A-Z])/g, ' $1').trim()}
+                                            </span>
+                                            <input
+                                                type="checkbox"
+                                                checked={(permissions as any)[key]}
+                                                onChange={e => setPermissions(prev => ({ ...prev, [key]: e.target.checked }))}
+                                                className="w-5 h-5"
+                                            />
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
-    useEffect(() => {
-        const fetchBlockedStatuses = async () => {
-            const statuses: Record<string, boolean> = {};
-            for (const label of labels) {
-                const admin = await api.getLabelAdmin(label.id);
-                if (admin && admin.isBlocked) {
-                    statuses[label.id] = true;
-                }
-            }
-            setBlockedStatus(statuses);
-        };
-        if (labels.length > 0) {
-            fetchBlockedStatuses();
-        }
-    }, [labels]);
+                        <div className="flex justify-between pt-4 border-t border-[#ccc]">
+                            <PmaButton variant="secondary" onClick={() => step === 1 ? setIsModalOpen(false) : setStep(s => s - 1)}>
+                                {step === 1 ? 'Cancel' : 'Back'}
+                            </PmaButton>
+                            {step < 3 ? (
+                                <PmaButton variant="primary" onClick={() => setStep(s => s + 1)}>
+                                    Next
+                                </PmaButton>
+                            ) : (
+                                <PmaButton variant="primary" onClick={executeSync} disabled={isLoading}>
+                                    {isLoading ? 'Saving...' : (editingLabelId ? 'Update' : 'Create')}
+                                </PmaButton>
+                            )}
+                        </div>
+                    </form>
+                ) : (
+                    <div className="p-4 space-y-4">
+                        <div className="bg-[#e8f4e8] border border-[#009900] p-4">
+                            <p className="text-[#009900] font-bold">Label created successfully!</p>
+                        </div>
+                        <div className="border-2 border-[#ccc] p-4 space-y-3">
+                            <div>
+                                <span className="text-xs text-[#666]">Auth Endpoint</span>
+                                <p className="font-medium">{createdResult.user.email}</p>
+                            </div>
+                            <div>
+                                <span className="text-xs text-[#666]">Master Key</span>
+                                <p className="font-mono text-lg bg-[#f5f5f5] px-3 py-2 border border-[#ccc] inline-block">{createdResult.user.password}</p>
+                            </div>
+                        </div>
+                        <PmaButton variant="primary" onClick={() => setIsModalOpen(false)} className="w-full">
+                            Close
+                        </PmaButton>
+                    </div>
+                )}
+            </Modal>
 
-    const handleOpenBlock = async (label: Label) => {
-        setLabelToBlock(label);
-        setBlockReason('');
-        const admin = await api.getLabelAdmin(label.id);
-        if (admin && admin.isBlocked) {
-             setBlockReason(admin.blockReason || '');
-        }
-        setIsBlockModalOpen(true);
-    };
+            {/* Block Modal */}
+            <Modal isOpen={isBlockModalOpen} onClose={() => !isBlocking && setIsBlockModalOpen(false)} title={blockedStatus[labelToBlock?.id || ''] ? "Restore Access" : "Suspend Access"} size="md">
+                <div className="p-4 space-y-4">
+                    <div className={`p-4 ${blockedStatus[labelToBlock?.id || ''] ? 'bg-[#e8f4e8] border border-[#009900]' : 'bg-[#ffcccc] border border-[#cc0000]'}`}>
+                        <p className={`font-bold ${blockedStatus[labelToBlock?.id || ''] ? 'text-[#009900]' : 'text-[#cc0000]'}`}>
+                            {blockedStatus[labelToBlock?.id || ''] ? 'Restore access' : 'Suspend access'} for "{labelToBlock?.name}"?
+                        </p>
+                    </div>
+                    {!blockedStatus[labelToBlock?.id || ''] && (
+                        <div>
+                            <label className="block text-xs font-bold text-[#666] mb-1">Suspension Reason</label>
+                            <textarea
+                                value={blockReason}
+                                onChange={e => setBlockReason(e.target.value)}
+                                className="w-full border-2 border-[#ccc] p-3 text-sm min-h-[80px] focus:border-[#cc0000] outline-none"
+                                placeholder="Enter reason for suspension..."
+                            />
+                        </div>
+                    )}
+                    <div className="flex gap-2">
+                        <PmaButton variant="secondary" onClick={() => setIsBlockModalOpen(false)} disabled={isBlocking}>Cancel</PmaButton>
+                        <PmaButton variant={blockedStatus[labelToBlock?.id || ''] ? "primary" : "danger"} onClick={confirmBlock} disabled={isBlocking}>
+                            {isBlocking ? 'Processing...' : (blockedStatus[labelToBlock?.id || ''] ? 'Restore' : 'Suspend')}
+                        </PmaButton>
+                    </div>
+                </div>
+            </Modal>
 
-    const confirmBlock = async () => {
-        if (!currentUser || !labelToBlock) return;
-        setIsBlocking(true);
-        try {
-            const admin = await api.getLabelAdmin(labelToBlock.id);
-            if (admin) {
-                if (blockedStatus[labelToBlock.id]) {
-                    await api.unblockUser(admin.id);
-                    showToast(`Access restored for "${labelToBlock.name}".`, 'success');
-                    setBlockedStatus(prev => ({ ...prev, [labelToBlock.id]: false }));
-                } else {
-                    await api.blockUser(admin.id, blockReason);
-                    showToast(`Access suspended for "${labelToBlock.name}".`, 'success');
-                    setBlockedStatus(prev => ({ ...prev, [labelToBlock.id]: true }));
-                }
-            } else {
-                showToast('No admin found for this label.', 'error');
-            }
-            setIsBlockModalOpen(false);
-            setLabelToBlock(null);
-        } catch (err: any) {
-            showToast(err.message || 'Action failed.', 'error');
-        } finally {
-            setIsBlocking(false);
-        }
-    };
+            {/* Delete Modal */}
+            <Modal isOpen={isDeleteModalOpen} onClose={() => !isDeleting && setIsDeleteModalOpen(false)} title="Delete Label" size="md">
+                <div className="p-4 space-y-4">
+                    <div className="p-4 bg-[#ffcccc] border border-[#cc0000]">
+                        <p className="font-bold text-[#cc0000]">
+                            Are you sure you want to delete "{labelToDelete?.name}"?
+                        </p>
+                        <p className="text-xs text-[#cc0000] mt-2">
+                            This action is irreversible and will delete all associated data (artists, releases, users).
+                        </p>
+                    </div>
+                    <div className="flex gap-2">
+                        <PmaButton variant="secondary" onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting}>Cancel</PmaButton>
+                        <PmaButton variant="danger" onClick={confirmDelete} disabled={isDeleting}>
+                            {isDeleting ? 'Deleting...' : 'Delete'}
+                        </PmaButton>
+                    </div>
+                </div>
+            </Modal>
+        </div>
+    );
+};
 
-    // This handles the final API synchronization
-    const executeSync = async () => {
-        if (!currentUser) return;
-        setIsLoading(true);
-        try {
-            if (editingLabelId) {
-                // Update Path
-                await api.updateLabel(editingLabelId, {
-                    name: formData.name,
-                    address: formData.address,
-                    city: formData.city,
-                    country: formData.country,
-                    taxId: formData.taxId,
-                    website: formData.website,
-                    phone: formData.phone,
-                    revenueShare: formData.revenueShare,
-                    maxArtists: formData.maxArtists
-                });
-                
-                // Update permissions for label admin
-                const admin = await api.getLabelAdmin(editingLabelId);
-                if (admin) {
-                    await api.updateUserPermissions(admin.id, permissions, currentUser);
-                    // Update admin name if changed
-                    if (formData.adminName !== admin.name) {
-                        await api.updateUser(admin.id, { name: formData.adminName });
-                    }
-                }
-                
-                showToast(`Node "${formData.name}" configuration synchronized.`, 'success');
-                setIsModalOpen(false);
-                await fetchLabels();
-            } else {
-                // Create Path
-                const result = await api.createLabel({
-                    ...formData,
-                    permissions
-                } as any);
-                const castedResult = result as any;
-                setCreatedResult(castedResult);
-                setLabels(prev => [...prev, castedResult.label]);
-                showToast('Branch established within network.', 'success');
-            }
-        } catch (err: any) {
-            showToast(err.message || 'Transmission failure.', 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleOpenDelete = (label: Label) => {
-        setLabelToDelete(label);
-        setIsDeleteModalOpen(true);
-    };
-
-    const confirmDelete = async () => {
-        if (!currentUser || !labelToDelete) return;
-        setIsDeleting(true);
-        try {
-            await api.deleteLabel(labelToDelete.id, currentUser);
-            showToast(`Node "${labelToDelete.name}" successfully terminated.`, 'success');
-            setIsDeleteModalOpen(false);
-            setLabelToDelete(null);
-            await fetchLabels();
-        } catch (err: any) {
-            showToast(err.message || 'Node termination failed.', 'error');
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
-    const handleOpenCreate = () => {
-        setFormData({
-            name: '', adminName: '', adminEmail: '', adminPassword: '',
-            address: '', city: '', country: '', taxId: '', website: '', phone: '',
-            revenueShare: 70, maxArtists: 10, parentLabelId: ''
-        });
-        setPermissions({
-            canManageArtists: true,
-            canManageReleases: true,
-            canCreateSubLabels: true,
-            canSubmitAlbums: true
-        });
-        setCreatedResult(null);
-        setEditingLabelId(null);
-        setStep(1);
-        setIsModalOpen(true);
-    };
-
-    const handleOpenEdit = async (label: Label) => {
-        setIsLoading(true);
-        setEditingLabelId(label.id);
-        setCreatedResult(null);
-        setStep(1);
-        
-        try {
-            const admin = await api.getLabelAdmin(label.id);
-            setFormData({
-                name: label.name || '',
-                adminName: admin?.name || '',
-                adminEmail: admin?.email || '',
-                adminPassword: '', 
-                address: label.address || '',
-                city: label.city || '',
-                country: label.country || '',
-                taxId: label.taxId || '',
-                website: label.website || '',
-                phone: label.phone || '',
-                revenueShare: label.revenueShare || 70,
-                maxArtists: label.maxArtists || 10,
-                parentLabelId: label.parentLabelId || ''
-            });
-            
-            setPermissions({
-                canManageArtists: admin?.permissions.canManageArtists ?? true,
-                canManageReleases: admin?.permissions.canManageReleases ?? true,
-                canCreateSubLabels: admin?.permissions.canCreateSubLabels ?? true,
-                canSubmitAlbums: admin?.permissions.canSubmitAlbums ?? true
-            });
-            
-            setIsModalOpen(true);
-        } catch (e) {
-            showToast('Failed to load node authority data.', 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleSendResetEmail = async () => {
-        if (!editingLabelId) return;
-        setIsLoading(true);
-        try {
-            const admin = await api.getLabelAdmin(editingLabelId);
-            if (admin && admin.email) {
-                await api.sendPasswordResetEmail(admin.email);
-                showToast(`Security reset link dispatched to ${admin.email}.`, 'success');
-            } else {
-                showToast('No administrative authority found for this node.', 'error');
-            }
-        } catch (e) {
-            showToast('Failed to dispatch security reset link.', 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const filteredLabels = useMemo(() => {
-        return labels.filter(l => 
-            l.name.toLowerCase().includes(filter.toLowerCase()) || 
-            (l.id && l.id.toLowerCase().includes(filter.toLowerCase())) ||
-            (l.country && l.country.toLowerCase().includes(filter.toLowerCase()))
-        ).sort((a, b) => a.name.localeCompare(b.name));
-    }, [labels, filter]);
-
-    const paginatedLabels = useMemo(() => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        return filteredLabels.slice(startIndex, startIndex + itemsPerPage);
-    }, [filteredLabels, currentPage]);
-
-    const canManage = currentUser?.role === UserRole.OWNER ||
-                      currentUser?.designation === "Co-Founder / Operations Head" ||
-                      currentUser?.permissions?.canOnboardLabels;
+// Original dark theme Labels for partner users (unchanged)
+const PartnerLabelsView: React.FC<{
+    currentUser: any;
+    labels: Label[];
+    isLoading: boolean;
+    filter: string;
+    setFilter: (f: string) => void;
+    blockedStatus: Record<string, boolean>;
+    canManage: boolean;
+    onOpenCreate: () => void;
+    onOpenEdit: (label: Label) => void;
+    onOpenDelete: (label: Label) => void;
+    onOpenBlock: (label: Label) => void;
+    currentPage: number;
+    setCurrentPage: (n: number) => void;
+    filteredLabels: Label[];
+    paginatedLabels: Label[];
+    itemsPerPage: number;
+    isModalOpen: boolean;
+    setIsModalOpen: (open: boolean) => void;
+    step: number;
+    setStep: (n: number) => void;
+    formData: any;
+    setFormData: (d: any) => void;
+    permissions: UserPermissions;
+    setPermissions: (p: UserPermissions) => void;
+    editingLabelId: string | null;
+    createdResult: {label: Label, user: User} | null;
+    executeSync: () => void;
+    handleSendResetEmail: () => void;
+    isDeleteModalOpen: boolean;
+    setIsDeleteModalOpen: (open: boolean) => void;
+    labelToDelete: Label | null;
+    isDeleting: boolean;
+    confirmDelete: () => void;
+    isBlockModalOpen: boolean;
+    setIsBlockModalOpen: (open: boolean) => void;
+    labelToBlock: Label | null;
+    blockReason: string;
+    setBlockReason: (r: string) => void;
+    isBlocking: boolean;
+    confirmBlock: () => void;
+}> = (props) => {
+    const {
+        currentUser, labels, isLoading, filter, setFilter, blockedStatus, canManage,
+        onOpenCreate, onOpenEdit, onOpenDelete, onOpenBlock,
+        currentPage, setCurrentPage, filteredLabels, paginatedLabels, itemsPerPage,
+        isModalOpen, setIsModalOpen, step, setStep, formData, setFormData,
+        permissions, setPermissions, editingLabelId, createdResult, executeSync,
+        handleSendResetEmail, isDeleteModalOpen, setIsDeleteModalOpen, labelToDelete,
+        isDeleting, confirmDelete, isBlockModalOpen, setIsBlockModalOpen, labelToBlock,
+        blockReason, setBlockReason, isBlocking, confirmBlock
+    } = props;
 
     return (
         <div className="space-y-8 animate-fade-in pb-20">
@@ -302,7 +471,7 @@ const Labels: React.FC = () => {
                     <h1 className="text-3xl font-black text-white uppercase tracking-tight">Partner Nodes</h1>
                     <p className="text-gray-500 mt-1 font-medium">Administration of global distribution branches and revenue share policies.</p>
                 </div>
-                <Button onClick={handleOpenCreate} className="px-10 h-12 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20">Establish Label</Button>
+                <Button onClick={onOpenCreate} className="px-10 h-12 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20">Establish Label</Button>
             </div>
 
             <div className="relative group max-w-xl">
@@ -356,21 +525,21 @@ const Labels: React.FC = () => {
                                     {canManage && (
                                         <div className="flex gap-2">
                                             <button 
-                                                onClick={() => handleOpenEdit(label)}
+                                                onClick={() => onOpenEdit(label)}
                                                 className="p-2.5 text-gray-600 hover:text-primary hover:bg-primary/10 rounded-xl transition-all"
                                                 title="Revise Node"
                                             >
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                             </button>
                                             <button
-                                                onClick={() => handleOpenDelete(label)}
+                                                onClick={() => onOpenDelete(label)}
                                                 className="p-2.5 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
                                                 title="Terminate Node"
                                             >
                                                 <TrashIcon className="w-5 h-5" />
                                             </button>
                                             <button
-                                                onClick={() => handleOpenBlock(label)}
+                                                onClick={() => onOpenBlock(label)}
                                                 className={`p-2.5 rounded-xl transition-all ${blockedStatus[label.id] ? 'text-red-500 bg-red-500/10 hover:bg-red-500/20' : 'text-gray-600 hover:text-yellow-500 hover:bg-yellow-500/10'}`}
                                                 title={blockedStatus[label.id] ? "Unblock Node" : "Block Node"}
                                             >
@@ -404,6 +573,7 @@ const Labels: React.FC = () => {
                 <Pagination totalItems={filteredLabels.length} itemsPerPage={itemsPerPage} currentPage={currentPage} onPageChange={setCurrentPage} />
             </div>
 
+            {/* Modals - same as original */}
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={createdResult ? "Node Activated" : (editingLabelId ? "Protocol: Revise Node" : "Protocol: New Node Setup")} size="3xl">
                 {!createdResult ? (
                     <form onSubmit={(e) => e.preventDefault()} className="space-y-10">
@@ -641,6 +811,392 @@ const Labels: React.FC = () => {
                 </div>
             </Modal>
         </div>
+    );
+};
+
+const Labels: React.FC = () => {
+    const { user: currentUser, showToast } = useContext(AppContext);
+    const [labels, setLabels] = useState<Label[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [step, setStep] = useState(1);
+    const [filter, setFilter] = useState('');
+    
+    // Deletion State
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [labelToDelete, setLabelToDelete] = useState<Label | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    // Blocking State
+    const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+    const [labelToBlock, setLabelToBlock] = useState<Label | null>(null);
+    const [blockReason, setBlockReason] = useState('');
+    const [isBlocking, setIsBlocking] = useState(false);
+    const [blockedStatus, setBlockedStatus] = useState<Record<string, boolean>>({});
+
+    // Editing State
+    const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 25;
+
+    const [createdResult, setCreatedResult] = useState<{label: Label, user: User} | null>(null);
+
+    const [formData, setFormData] = useState({
+        name: '',
+        adminName: '',
+        adminEmail: '',
+        adminPassword: '',
+        address: '',
+        city: '',
+        country: '',
+        taxId: '',
+        website: '',
+        phone: '',
+        revenueShare: 70,
+        maxArtists: 10,
+        parentLabelId: ''
+    });
+
+    const [permissions, setPermissions] = useState<UserPermissions>({
+        canManageArtists: true,
+        canManageReleases: true,
+        canCreateSubLabels: true,
+        canSubmitAlbums: true
+    });
+
+    const fetchLabels = async () => {
+        setIsLoading(true);
+        try {
+            const data = await api.getLabels();
+            setLabels(data);
+        } catch (e) {
+            showToast('Failed to load partners.', 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (currentUser?.role === UserRole.OWNER || currentUser?.permissions?.canOnboardLabels) {
+            fetchLabels();
+        }
+    }, [currentUser]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filter]);
+
+    useEffect(() => {
+        const fetchBlockedStatuses = async () => {
+            const statuses: Record<string, boolean> = {};
+            for (const label of labels) {
+                const admin = await api.getLabelAdmin(label.id);
+                if (admin && admin.isBlocked) {
+                    statuses[label.id] = true;
+                }
+            }
+            setBlockedStatus(statuses);
+        };
+        if (labels.length > 0) {
+            fetchBlockedStatuses();
+        }
+    }, [labels]);
+
+    const handleOpenBlock = async (label: Label) => {
+        setLabelToBlock(label);
+        setBlockReason('');
+        const admin = await api.getLabelAdmin(label.id);
+        if (admin && admin.isBlocked) {
+             setBlockReason(admin.blockReason || '');
+        }
+        setIsBlockModalOpen(true);
+    };
+
+    const confirmBlock = async () => {
+        if (!currentUser || !labelToBlock) return;
+        setIsBlocking(true);
+        try {
+            const admin = await api.getLabelAdmin(labelToBlock.id);
+            if (admin) {
+                if (blockedStatus[labelToBlock.id]) {
+                    await api.unblockUser(admin.id);
+                    showToast(`Access restored for "${labelToBlock.name}".`, 'success');
+                    setBlockedStatus(prev => ({ ...prev, [labelToBlock.id]: false }));
+                } else {
+                    await api.blockUser(admin.id, blockReason);
+                    showToast(`Access suspended for "${labelToBlock.name}".`, 'success');
+                    setBlockedStatus(prev => ({ ...prev, [labelToBlock.id]: true }));
+                }
+            } else {
+                showToast('No admin found for this label.', 'error');
+            }
+            setIsBlockModalOpen(false);
+            setLabelToBlock(null);
+        } catch (err: any) {
+            showToast(err.message || 'Action failed.', 'error');
+        } finally {
+            setIsBlocking(false);
+        }
+    };
+
+    const executeSync = async () => {
+        if (!currentUser) return;
+        setIsLoading(true);
+        try {
+            if (editingLabelId) {
+                await api.updateLabel(editingLabelId, {
+                    name: formData.name,
+                    address: formData.address,
+                    city: formData.city,
+                    country: formData.country,
+                    taxId: formData.taxId,
+                    website: formData.website,
+                    phone: formData.phone,
+                    revenueShare: formData.revenueShare,
+                    maxArtists: formData.maxArtists
+                });
+                
+                const admin = await api.getLabelAdmin(editingLabelId);
+                if (admin) {
+                    await api.updateUserPermissions(admin.id, permissions, currentUser);
+                    if (formData.adminName !== admin.name) {
+                        await api.updateUser(admin.id, { name: formData.adminName });
+                    }
+                }
+                
+                showToast(`Node "${formData.name}" configuration synchronized.`, 'success');
+                setIsModalOpen(false);
+                await fetchLabels();
+            } else {
+                const result = await api.createLabel({
+                    ...formData,
+                    permissions
+                } as any);
+                const castedResult = result as any;
+                setCreatedResult(castedResult);
+                setLabels(prev => [...prev, castedResult.label]);
+                showToast('Branch established within network.', 'success');
+            }
+        } catch (err: any) {
+            showToast(err.message || 'Transmission failure.', 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleOpenDelete = (label: Label) => {
+        setLabelToDelete(label);
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!currentUser || !labelToDelete) return;
+        setIsDeleting(true);
+        try {
+            // Use window.confirm as a final check if not already confirmed by modal
+            if (!window.confirm(`Are you absolutely sure you want to delete "${labelToDelete.name}"? This will delete all associated artists, releases, and users.`)) {
+                setIsDeleting(false);
+                return;
+            }
+            await api.deleteLabel(labelToDelete.id, currentUser);
+            showToast(`Node "${labelToDelete.name}" successfully terminated.`, 'success');
+            setIsDeleteModalOpen(false);
+            setLabelToDelete(null);
+            await fetchLabels();
+        } catch (err: any) {
+            showToast(err.message || 'Node termination failed.', 'error');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleOpenCreate = () => {
+        setFormData({
+            name: '', adminName: '', adminEmail: '', adminPassword: '',
+            address: '', city: '', country: '', taxId: '', website: '', phone: '',
+            revenueShare: 70, maxArtists: 10, parentLabelId: ''
+        });
+        setPermissions({
+            canManageArtists: true,
+            canManageReleases: true,
+            canCreateSubLabels: true,
+            canSubmitAlbums: true
+        });
+        setCreatedResult(null);
+        setEditingLabelId(null);
+        setStep(1);
+        setIsModalOpen(true);
+    };
+
+    const handleOpenEdit = async (label: Label) => {
+        setIsLoading(true);
+        setEditingLabelId(label.id);
+        setCreatedResult(null);
+        setStep(1);
+        
+        try {
+            const admin = await api.getLabelAdmin(label.id);
+            setFormData({
+                name: label.name || '',
+                adminName: admin?.name || '',
+                adminEmail: admin?.email || '',
+                adminPassword: '', 
+                address: label.address || '',
+                city: label.city || '',
+                country: label.country || '',
+                taxId: label.taxId || '',
+                website: label.website || '',
+                phone: label.phone || '',
+                revenueShare: label.revenueShare || 70,
+                maxArtists: label.maxArtists || 10,
+                parentLabelId: label.parentLabelId || ''
+            });
+            
+            setPermissions({
+                canManageArtists: admin?.permissions.canManageArtists ?? true,
+                canManageReleases: admin?.permissions.canManageReleases ?? true,
+                canCreateSubLabels: admin?.permissions.canCreateSubLabels ?? true,
+                canSubmitAlbums: admin?.permissions.canSubmitAlbums ?? true
+            });
+            
+            setIsModalOpen(true);
+        } catch (e) {
+            showToast('Failed to load node authority data.', 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSendResetEmail = async () => {
+        if (!editingLabelId) return;
+        setIsLoading(true);
+        try {
+            const admin = await api.getLabelAdmin(editingLabelId);
+            if (admin && admin.email) {
+                await api.sendPasswordResetEmail(admin.email);
+                showToast(`Security reset link dispatched to ${admin.email}.`, 'success');
+            } else {
+                showToast('No administrative authority found for this node.', 'error');
+            }
+        } catch (e) {
+            showToast('Failed to dispatch security reset link.', 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const filteredLabels = useMemo(() => {
+        return labels.filter(l => 
+            l.name.toLowerCase().includes(filter.toLowerCase()) || 
+            (l.id && l.id.toLowerCase().includes(filter.toLowerCase())) ||
+            (l.country && l.country.toLowerCase().includes(filter.toLowerCase()))
+        ).sort((a, b) => a.name.localeCompare(b.name));
+    }, [labels, filter]);
+
+    const paginatedLabels = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredLabels.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredLabels, currentPage]);
+
+    const canManage = currentUser?.role === UserRole.OWNER ||
+                      currentUser?.designation === "Co-Founder / Operations Head" ||
+                      currentUser?.permissions?.canOnboardLabels;
+
+    const isPlatformSide = currentUser?.role === UserRole.OWNER || currentUser?.role === UserRole.EMPLOYEE;
+
+    // Use phpMyAdmin style for admin/employee users
+    if (isPlatformSide) {
+        return (
+            <PmaLabelsView
+                currentUser={currentUser}
+                labels={labels}
+                isLoading={isLoading}
+                filter={filter}
+                setFilter={setFilter}
+                blockedStatus={blockedStatus}
+                canManage={canManage}
+                onOpenCreate={handleOpenCreate}
+                onOpenEdit={handleOpenEdit}
+                onOpenDelete={handleOpenDelete}
+                onOpenBlock={handleOpenBlock}
+                currentPage={currentPage}
+                setCurrentPage={setCurrentPage}
+                filteredLabels={filteredLabels}
+                paginatedLabels={paginatedLabels}
+                itemsPerPage={itemsPerPage}
+                isModalOpen={isModalOpen}
+                setIsModalOpen={setIsModalOpen}
+                step={step}
+                setStep={setStep}
+                formData={formData}
+                setFormData={setFormData}
+                permissions={permissions}
+                setPermissions={setPermissions}
+                editingLabelId={editingLabelId}
+                createdResult={createdResult}
+                executeSync={executeSync}
+                handleSendResetEmail={handleSendResetEmail}
+                isDeleteModalOpen={isDeleteModalOpen}
+                setIsDeleteModalOpen={setIsDeleteModalOpen}
+                labelToDelete={labelToDelete}
+                isDeleting={isDeleting}
+                confirmDelete={confirmDelete}
+                isBlockModalOpen={isBlockModalOpen}
+                setIsBlockModalOpen={setIsBlockModalOpen}
+                labelToBlock={labelToBlock}
+                blockReason={blockReason}
+                setBlockReason={setBlockReason}
+                isBlocking={isBlocking}
+                confirmBlock={confirmBlock}
+            />
+        );
+    }
+
+    // Use dark theme for partner users
+    return (
+        <PartnerLabelsView
+            currentUser={currentUser}
+            labels={labels}
+            isLoading={isLoading}
+            filter={filter}
+            setFilter={setFilter}
+            blockedStatus={blockedStatus}
+            canManage={canManage}
+            onOpenCreate={handleOpenCreate}
+            onOpenEdit={handleOpenEdit}
+            onOpenDelete={handleOpenDelete}
+            onOpenBlock={handleOpenBlock}
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            filteredLabels={filteredLabels}
+            paginatedLabels={paginatedLabels}
+            itemsPerPage={itemsPerPage}
+            isModalOpen={isModalOpen}
+            setIsModalOpen={setIsModalOpen}
+            step={step}
+            setStep={setStep}
+            formData={formData}
+            setFormData={setFormData}
+            permissions={permissions}
+            setPermissions={setPermissions}
+            editingLabelId={editingLabelId}
+            createdResult={createdResult}
+            executeSync={executeSync}
+            handleSendResetEmail={handleSendResetEmail}
+            isDeleteModalOpen={isDeleteModalOpen}
+            setIsDeleteModalOpen={setIsDeleteModalOpen}
+            labelToDelete={labelToDelete}
+            isDeleting={isDeleting}
+                confirmDelete={confirmDelete}
+                isBlockModalOpen={isBlockModalOpen}
+            setIsBlockModalOpen={setIsBlockModalOpen}
+            labelToBlock={labelToBlock}
+            blockReason={blockReason}
+            setBlockReason={setBlockReason}
+            isBlocking={isBlocking}
+            confirmBlock={confirmBlock}
+        />
     );
 };
 

@@ -51,12 +51,77 @@ export default {
       }
 
       // Routing
-      if (path.startsWith('/users')) return await handleUsers(request, env, corsHeaders);
-      if (path.startsWith('/labels')) return await handleLabels(request, env, corsHeaders);
-      if (path.startsWith('/artists')) return await handleArtists(request, env, corsHeaders, user);
+      if (path.startsWith('/users')) {
+        const user = await authenticate(request, env);
+        if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        
+        const isPlatformSide = user.role === 'Owner' || user.role === 'Employee';
+        // Allow Label Admins to manage users if they are managing users of their own sub-labels
+        if (!isPlatformSide && !(user.role === 'Label Admin')) {
+            const adminCheck = await requireAdmin(request, env, corsHeaders);
+            if (adminCheck.error) return adminCheck.error;
+        }
+        return await handleUsers(request, env, corsHeaders, user);
+      }
+      
+      if (path.startsWith('/labels')) {
+        // Only admins can manage labels (POST, PUT, DELETE)
+        if (method !== 'GET') {
+            const user = await authenticate(request, env);
+            if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            
+            const isPlatformSide = user.role === 'Owner' || user.role === 'Employee';
+            // Allow Label Admins to create sub-labels if they have permission
+            // Allow Platform Side to do anything
+            if (!isPlatformSide && !(method === 'POST' && user.role === 'Label Admin' && user.permissions?.canCreateSubLabels)) {
+                const adminCheck = await requireAdmin(request, env, corsHeaders);
+                if (adminCheck.error) return adminCheck.error;
+            }
+        } else {
+            // Even for GET, ensure the user is authenticated
+            const user = await authenticate(request, env);
+            if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            
+            // We allow GET /labels for all authenticated users, but handleLabels will filter the results.
+            // The canOnboardLabels permission is only strictly required for the full Labels management page,
+            // but other pages need to fetch labels for hierarchy/dropdowns.
+        }
+        return await handleLabels(request, env, corsHeaders);
+      }
+
+      if (path.startsWith('/artists')) {
+          // Allow GET for all authenticated users to fetch artists for dropdowns
+          // Allow POST, PUT, DELETE for labels to manage their own artists
+          if (method !== 'GET' && method !== 'POST' && method !== 'PUT' && method !== 'DELETE') {
+              const adminCheck = await requireAdmin(request, env, corsHeaders);
+              if (adminCheck.error) return adminCheck.error;
+          }
+          return await handleArtists(request, env, corsHeaders, user);
+      }
+      
+      if (path === '/releases/export' && method === 'GET') {
+        const adminCheck = await requireAdmin(request, env, corsHeaders);
+        if (adminCheck.error) return adminCheck.error;
+        return await handleExportReleases(request, env, corsHeaders);
+      }
+
       if (path.startsWith('/releases')) return await handleReleases(request, env, corsHeaders, user);
-      if (path.startsWith('/notices')) return await handleNotices(request, env, corsHeaders, user);
-      if (path.startsWith('/revenue')) return await handleRevenue(request, env, corsHeaders);
+      
+      if (path.startsWith('/notices')) {
+        // Only admins can manage notices (POST, PUT, DELETE)
+        if (method !== 'GET') {
+            const adminCheck = await requireAdmin(request, env, corsHeaders);
+            if (adminCheck.error) return adminCheck.error;
+        }
+        return await handleNotices(request, env, corsHeaders, user);
+      }
+
+      if (path.startsWith('/revenue')) {
+        const adminCheck = await requireAdmin(request, env, corsHeaders);
+        if (adminCheck.error) return adminCheck.error;
+        return await handleRevenue(request, env, corsHeaders);
+      }
+
       if (path.startsWith('/search')) return await handleSearch(request, env, corsHeaders);
       if (path.startsWith('/stats')) return await handleStats(request, env, corsHeaders);
       
@@ -107,6 +172,11 @@ async function handleVerifyAuth(request: Request, env: Env, corsHeaders: any) {
 }
 
 import { createMimeMessage } from "mimetext";
+import { getResetPasswordEmail } from "./emails/resetPassword";
+import { getWelcomeEmail } from "./emails/welcome";
+import { getLabelRegistrationEmail } from "./emails/labelRegistration";
+import { getCorrectionEmail } from "./emails/correction";
+import { getPublicationEmail } from "./emails/publication";
 
 /**
  * Handle Change Password (Authenticated)
@@ -199,65 +269,7 @@ async function handleResetPassword(request: Request, env: Env, corsHeaders: any)
 
         // 4. Send Email via ZeptoMail
         try {
-            // Professional HTML Template
-            const htmlTemplate = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1a202c; margin: 0; padding: 0; }
-                    .wrapper { background-color: #f7fafc; padding: 40px 20px; }
-                    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0; }
-                    .header { background-color: #000000; padding: 30px; text-align: center; }
-                    .header h1 { color: #ffffff; margin: 0; font-size: 22px; letter-spacing: 2px; font-weight: 700; }
-                    .body { padding: 40px; }
-                    .alert-title { font-size: 20px; font-weight: 700; color: #2d3748; margin-bottom: 20px; }
-                    .password-box { background-color: #edf2f7; border: 2px dashed #cbd5e0; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0; }
-                    .password-text { font-family: 'Courier New', Courier, monospace; font-size: 28px; font-weight: bold; color: #2b6cb0; letter-spacing: 4px; }
-                    .button-container { text-align: center; margin-top: 30px; }
-                    .button { background-color: #3182ce; color: #ffffff !important; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; }
-                    .footer { padding: 25px; text-align: center; font-size: 13px; color: #718096; background-color: #f8fafc; }
-                    .warning { font-size: 12px; color: #a0aec0; margin-top: 20px; border-top: 1px solid #edf2f7; padding-top: 20px; }
-                </style>
-            </head>
-            <body>
-                <div class="wrapper">
-                    <div class="container">
-                        <div class="header">
-                            <h1>DIGITALSIGHT</h1>
-                        </div>
-                        <div class="body">
-                            <div class="alert-title">Credential Recovery Protocol</div>
-                            <p>Hello,</p>
-                            <p>We received a request to access your DigitalSight vault. A temporary access key has been generated for your account.</p>
-                            
-                            <div class="password-box">
-                                <div style="font-size: 12px; color: #718096; margin-bottom: 8px; text-transform: uppercase;">Temporary Key</div>
-                                <div class="password-text">${newPassword}</div>
-                            </div>
-
-                            <p>Please use this key to log in. You will be required to change this password immediately after access is restored.</p>
-                            
-                            <div class="button-container">
-                                <a href="https://app.digitalsight.in/login" class="button">Log In to Vault</a>
-                            </div>
-
-                            <div class="warning">
-                                If you did not request this reset, please ignore this email or contact security support if you have concerns about your account.
-                            </div>
-                        </div>
-                        <div class="footer">
-                            &copy; 2026 DigitalSight <br>
-                            Managed via Cloudflare Shielded Infrastructure
-                        </div>
-                    </div>
-                </div>
-            </body>
-            </html>
-            `;
-
-            const textBody = `Hello,\n\nYour new temporary vault key is: ${newPassword}\n\nLogin here: https://digitalsight.in/login`;
+            const { html: htmlTemplate, text: textBody } = getResetPasswordEmail(newPassword);
 
             await sendZeptoEmail(env, user.email, "Credential Recovery Protocol", htmlTemplate, textBody);
             
@@ -279,16 +291,55 @@ async function handleResetPassword(request: Request, env: Env, corsHeaders: any)
 }
 // --- CRUD Handlers ---
 
-async function handleUsers(request: Request, env: Env, corsHeaders: any) {
+async function handleUsers(request: Request, env: Env, corsHeaders: any, currentUser: any) {
     const url = new URL(request.url);
     const id = url.pathname.split('/').pop();
 
     if (request.method === 'GET') {
         if (id && id !== 'users') {
             const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first() as any;
+            if (!user) return new Response(null, { status: 404, headers: corsHeaders });
+
+            // Security check
+            const isPlatformSide = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+            if (!isPlatformSide) {
+                // Label Admin can only see users of their own label or sub-labels
+                if (user.label_id !== currentUser.labelId) {
+                    // Check if it's a sub-label
+                    const isSubLabel = await env.DB.prepare(`
+                        WITH RECURSIVE sub_labels AS (
+                            SELECT id FROM labels WHERE id = ?
+                            UNION ALL
+                            SELECT l.id FROM labels l JOIN sub_labels sl ON l.parent_label_id = sl.id
+                        )
+                        SELECT 1 FROM sub_labels WHERE id = ?
+                    `).bind(currentUser.labelId, user.label_id).first();
+                    
+                    if (!isSubLabel) {
+                        return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+                    }
+                }
+            }
+
             return new Response(JSON.stringify(mapUser(user)), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
-        const { results } = await env.DB.prepare('SELECT * FROM users').all();
+        
+        let query = 'SELECT * FROM users';
+        let params: any[] = [];
+        const isPlatformSide = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+        if (!isPlatformSide) {
+            query = `
+                WITH RECURSIVE sub_labels AS (
+                    SELECT id FROM labels WHERE id = ?
+                    UNION ALL
+                    SELECT l.id FROM labels l JOIN sub_labels sl ON l.parent_label_id = sl.id
+                )
+                SELECT * FROM users WHERE label_id IN (SELECT id FROM sub_labels)
+            `;
+            params = [currentUser.labelId];
+        }
+
+        const { results } = await env.DB.prepare(query).bind(...params).all();
         return new Response(JSON.stringify(results.map(mapUser)), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -297,6 +348,24 @@ async function handleUsers(request: Request, env: Env, corsHeaders: any) {
         const newId = crypto.randomUUID();
         const randomPassword = Math.random().toString(36).slice(-8);
         const passwordToSave = data.password || randomPassword;
+
+        // Security check
+        const isPlatformSide = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+        if (!isPlatformSide) {
+            // Label Admin can only create users for their own label or sub-labels
+            const isAuthorized = await env.DB.prepare(`
+                WITH RECURSIVE sub_labels AS (
+                    SELECT id FROM labels WHERE id = ?
+                    UNION ALL
+                    SELECT l.id FROM labels l JOIN sub_labels sl ON l.parent_label_id = sl.id
+                )
+                SELECT 1 FROM sub_labels WHERE id = ?
+            `).bind(currentUser.labelId, data.labelId).first();
+
+            if (!isAuthorized) {
+                return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+        }
         
         await env.DB.prepare('INSERT INTO users (id, name, email, password_hash, role, designation, label_id, artist_id, permissions) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
             .bind(newId, sanitize(data.name), sanitize(data.email), sanitize(passwordToSave), sanitize(data.role), sanitize(data.designation), sanitize(data.labelId), sanitize(data.artistId), JSON.stringify(data.permissions))
@@ -304,9 +373,7 @@ async function handleUsers(request: Request, env: Env, corsHeaders: any) {
         
         // Send welcome email
         try {
-            const subject = "Welcome to Digitalsight";
-            const textBody = `Hello ${data.name},\n\nYour account has been created.\nYour temporary password is: ${passwordToSave}\n\nPlease log in at https://digitalsight.in/login and change your password.`;
-            const htmlBody = `<h3>Welcome to Digitalsight</h3><p>Hello ${data.name},</p><p>Your account has been created.</p><p>Temporary Password: <b>${passwordToSave}</b></p><p>Please log in at <a href="https://digitalsight.in/login">https://digitalsight.in/login</a> and change your password.</p>`;
+            const { subject, html: htmlBody, text: textBody } = getWelcomeEmail(data.name, passwordToSave);
 
             await sendZeptoEmail(env, data.email, subject, htmlBody, textBody);
         } catch (e) {
@@ -323,6 +390,24 @@ async function handleUsers(request: Request, env: Env, corsHeaders: any) {
         const current = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first() as any;
         if (!current) return new Response(null, { status: 404, headers: corsHeaders });
 
+        // Security check
+        const isPlatformSide = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+        if (!isPlatformSide) {
+            // Label Admin can only update users of their own label or sub-labels
+            const isAuthorized = await env.DB.prepare(`
+                WITH RECURSIVE sub_labels AS (
+                    SELECT id FROM labels WHERE id = ?
+                    UNION ALL
+                    SELECT l.id FROM labels l JOIN sub_labels sl ON l.parent_label_id = sl.id
+                )
+                SELECT 1 FROM sub_labels WHERE id = ?
+            `).bind(currentUser.labelId, current.label_id).first();
+
+            if (!isAuthorized) {
+                return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+        }
+
         const name = data.name !== undefined ? data.name : current.name;
         const role = data.role !== undefined ? data.role : current.role;
         const designation = data.designation !== undefined ? data.designation : current.designation;
@@ -337,6 +422,26 @@ async function handleUsers(request: Request, env: Env, corsHeaders: any) {
     }
 
     if (request.method === 'DELETE' && id) {
+        const current = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first() as any;
+        if (!current) return new Response(null, { status: 404, headers: corsHeaders });
+
+        // Security check
+        const isPlatformSide = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+        if (!isPlatformSide) {
+            const isAuthorized = await env.DB.prepare(`
+                WITH RECURSIVE sub_labels AS (
+                    SELECT id FROM labels WHERE id = ?
+                    UNION ALL
+                    SELECT l.id FROM labels l JOIN sub_labels sl ON l.parent_label_id = sl.id
+                )
+                SELECT 1 FROM sub_labels WHERE id = ?
+            `).bind(currentUser.labelId, current.label_id).first();
+
+            if (!isAuthorized) {
+                return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+        }
+
         await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
         return new Response(null, { status: 204, headers: corsHeaders });
     }
@@ -347,6 +452,8 @@ async function handleUsers(request: Request, env: Env, corsHeaders: any) {
 async function handleLabels(request: Request, env: Env, corsHeaders: any) {
     const url = new URL(request.url);
     const id = url.pathname.split('/').pop();
+    const currentUser = await authenticate(request, env);
+    if (!currentUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     if (request.method === 'GET') {
         if (id && id !== 'labels') {
@@ -355,14 +462,57 @@ async function handleLabels(request: Request, env: Env, corsHeaders: any) {
                 FROM labels l 
                 LEFT JOIN users u ON l.owner_id = u.id 
                 WHERE l.id = ?
-            `).bind(id).first();
+            `).bind(id).first() as any;
+
+            if (!label) return new Response(null, { status: 404, headers: corsHeaders });
+
+            const isPlatformSide = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+            if (!isPlatformSide) {
+                // Check if it's their own label or a sub-label
+                if (label.id !== currentUser.labelId) {
+                    const isSubLabel = await env.DB.prepare(`
+                        WITH RECURSIVE sub_labels AS (
+                            SELECT id FROM labels WHERE id = ?
+                            UNION ALL
+                            SELECT l.id FROM labels l JOIN sub_labels sl ON l.parent_label_id = sl.id
+                        )
+                        SELECT 1 FROM sub_labels WHERE id = ?
+                    `).bind(currentUser.labelId, label.id).first();
+                    
+                    if (!isSubLabel) {
+                        return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+                    }
+                }
+            }
+
             return new Response(JSON.stringify(mapLabel(label)), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
-        const { results } = await env.DB.prepare(`
+
+        let query = `
             SELECT l.*, u.email as owner_email 
             FROM labels l 
             LEFT JOIN users u ON l.owner_id = u.id
-        `).all();
+        `;
+        let params: any[] = [];
+
+        const isPlatformSide = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+        if (!isPlatformSide) {
+            // Label Admin or other roles can only see their own label and sub-labels
+            query = `
+                WITH RECURSIVE sub_labels AS (
+                    SELECT id FROM labels WHERE id = ?
+                    UNION ALL
+                    SELECT l.id FROM labels l JOIN sub_labels sl ON l.parent_label_id = sl.id
+                )
+                SELECT l.*, u.email as owner_email 
+                FROM labels l 
+                LEFT JOIN users u ON l.owner_id = u.id
+                WHERE l.id IN (SELECT id FROM sub_labels)
+            `;
+            params = [currentUser.labelId];
+        }
+
+        const { results } = await env.DB.prepare(query).bind(...params).all();
         return new Response(JSON.stringify(results.map(mapLabel)), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -372,6 +522,14 @@ async function handleLabels(request: Request, env: Env, corsHeaders: any) {
         const userId = crypto.randomUUID();
         const randomPassword = Math.random().toString(36).slice(-8);
         const passwordToSave = data.adminPassword || randomPassword;
+
+        // Security check: If not staff, ensure they are creating sub-label for their own label
+        const isStaff = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+        if (!isStaff) {
+            if (data.parentLabelId !== currentUser.labelId) {
+                return new Response(JSON.stringify({ error: 'Forbidden: Cannot create sub-label for another label' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+        }
 
         // 1. Create Label
         await env.DB.prepare(`
@@ -417,9 +575,7 @@ async function handleLabels(request: Request, env: Env, corsHeaders: any) {
 
         // Send welcome email to label admin
         try {
-            const subject = "Label Registration - Digitalsight";
-            const textBody = `Hello ${data.adminName},\n\nYour label "${data.name}" has been registered on Digitalsight.\nYour admin account has been created.\n\nEmail: ${data.adminEmail}\nPassword: ${passwordToSave}\n\nPlease log in at https://digitalsight.in/login and complete your profile.`;
-            const htmlBody = `<h3>Label Registration - Digitalsight</h3><p>Hello ${data.adminName},</p><p>Your label "<b>${data.name}</b>" has been registered on Digitalsight.</p><p>Admin Account Created:</p><ul><li>Email: ${data.adminEmail}</li><li>Password: ${passwordToSave}</li></ul><p>Please log in at <a href="https://digitalsight.in/login">https://digitalsight.in/login</a> and complete your profile.</p>`;
+            const { subject, html: htmlBody, text: textBody } = getLabelRegistrationEmail(data.adminName, data.name, data.adminEmail, passwordToSave);
 
             await sendZeptoEmail(env, data.adminEmail, subject, htmlBody, textBody);
         } catch (e) {
@@ -433,6 +589,14 @@ async function handleLabels(request: Request, env: Env, corsHeaders: any) {
         const data = await request.json() as any;
         const current = await env.DB.prepare('SELECT * FROM labels WHERE id = ?').bind(id).first() as any;
         if (!current) return new Response(null, { status: 404, headers: corsHeaders });
+
+        // Security check: If not staff, ensure they are updating their own sub-label
+        const isStaff = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+        if (!isStaff) {
+            if (current.parent_label_id !== currentUser.labelId) {
+                return new Response(JSON.stringify({ error: 'Forbidden: Cannot update this label' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+        }
 
         const name = data.name !== undefined ? data.name : current.name;
         const parentLabelId = data.parentLabelId !== undefined ? data.parentLabelId : current.parent_label_id;
@@ -468,6 +632,27 @@ async function handleLabels(request: Request, env: Env, corsHeaders: any) {
     }
 
     if (request.method === 'DELETE' && id) {
+        const current = await env.DB.prepare('SELECT * FROM labels WHERE id = ?').bind(id).first() as any;
+        if (!current) return new Response(null, { status: 404, headers: corsHeaders });
+
+        // Security check: If not staff, ensure they are deleting their own sub-label
+        const isStaff = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+        if (!isStaff) {
+            if (current.parent_label_id !== currentUser.labelId) {
+                return new Response(JSON.stringify({ error: 'Forbidden: Cannot delete this label' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+        }
+
+        // Delete associated artists
+        await env.DB.prepare('DELETE FROM artists WHERE label_id = ?').bind(id).run();
+        
+        // Delete associated releases and tracks
+        const { results: releases } = await env.DB.prepare('SELECT id FROM releases WHERE label_id = ?').bind(id).all();
+        for (const release of releases) {
+            await env.DB.prepare('DELETE FROM tracks WHERE release_id = ?').bind(release.id).run();
+            await env.DB.prepare('DELETE FROM releases WHERE id = ?').bind(release.id).run();
+        }
+
         await env.DB.prepare('DELETE FROM labels WHERE id = ?').bind(id).run();
         // Also delete associated users? Usually yes for label admins
         await env.DB.prepare('DELETE FROM users WHERE label_id = ?').bind(id).run();
@@ -498,7 +683,19 @@ async function handleArtists(request: Request, env: Env, corsHeaders: any, curre
         let params: any[] = [];
 
         const isStaff = currentUser.role === 'Owner' || currentUser.role === 'Employee';
-        if (!isStaff) {
+        const targetLabelId = url.searchParams.get('labelId');
+
+        if (targetLabelId) {
+            query = `
+                WITH RECURSIVE sub_labels AS (
+                    SELECT id FROM labels WHERE id = ?
+                    UNION ALL
+                    SELECT l.id FROM labels l JOIN sub_labels sl ON l.parent_label_id = sl.id
+                )
+                SELECT * FROM artists WHERE label_id IN (SELECT id FROM sub_labels)
+            `;
+            params = [targetLabelId];
+        } else if (!isStaff) {
             const userLabelId = await getUserLabelId();
             if (userLabelId) {
                 query = `
@@ -513,6 +710,10 @@ async function handleArtists(request: Request, env: Env, corsHeaders: any, curre
             } else {
                 return new Response(JSON.stringify([]), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
+        } else {
+            // Staff with no targetLabelId - return all artists
+            query = 'SELECT * FROM artists';
+            params = [];
         }
 
         const { results } = await env.DB.prepare(query).bind(...params).all();
@@ -530,6 +731,15 @@ async function handleArtists(request: Request, env: Env, corsHeaders: any, curre
         const appleMusicId = data.appleMusicId || null;
         const instagramUrl = data.instagramUrl || null;
         const email = data.email || null;
+
+        // Security check: If not staff, ensure they are creating artist for their own label
+        const isStaff = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+        if (!isStaff) {
+            const userLabelId = await getUserLabelId();
+            if (labelId !== userLabelId) {
+                return new Response(JSON.stringify({ error: 'Forbidden: Cannot create artist for another label' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+        }
 
         await env.DB.prepare('INSERT INTO artists (id, name, label_id, type, spotify_id, apple_music_id, instagram_url, email) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
             .bind(newId, name, labelId, type, spotifyId, appleMusicId, instagramUrl, email)
@@ -550,6 +760,20 @@ async function handleArtists(request: Request, env: Env, corsHeaders: any, curre
         const instagramUrl = data.instagramUrl || null;
         const email = data.email || null;
 
+        // Security check: If not staff, ensure they are updating artist for their own label
+        const isStaff = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+        if (!isStaff) {
+            const userLabelId = await getUserLabelId();
+            const artist = await env.DB.prepare('SELECT label_id FROM artists WHERE id = ?').bind(id).first() as any;
+            if (!artist || artist.label_id !== userLabelId) {
+                return new Response(JSON.stringify({ error: 'Forbidden: Cannot update artist for another label' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+            // Also prevent moving artist to another label
+            if (labelId !== userLabelId) {
+                return new Response(JSON.stringify({ error: 'Forbidden: Cannot move artist to another label' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+        }
+
         await env.DB.prepare('UPDATE artists SET name = ?, label_id = ?, type = ?, spotify_id = ?, apple_music_id = ?, instagram_url = ?, email = ? WHERE id = ?')
             .bind(name, labelId, type, spotifyId, appleMusicId, instagramUrl, email, id)
             .run();
@@ -557,6 +781,16 @@ async function handleArtists(request: Request, env: Env, corsHeaders: any, curre
     }
 
     if (request.method === 'DELETE' && id) {
+        // Security check: If not staff, ensure they are deleting artist for their own label
+        const isStaff = currentUser.role === 'Owner' || currentUser.role === 'Employee';
+        if (!isStaff) {
+            const userLabelId = await getUserLabelId();
+            const artist = await env.DB.prepare('SELECT label_id FROM artists WHERE id = ?').bind(id).first() as any;
+            if (!artist || artist.label_id !== userLabelId) {
+                return new Response(JSON.stringify({ error: 'Forbidden: Cannot delete artist for another label' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+        }
+
         // Check if artist is used in any release that is not Draft or Takedown
         const usedIn = await env.DB.prepare(`
             SELECT id FROM releases 
@@ -782,78 +1016,52 @@ async function handleReleases(request: Request, env: Env, corsHeaders: any, curr
                     `).bind(current.label_id).first() as any;
 
                     if (labelInfo && labelInfo.email) {
-                        const subject = `Action Required: Correction Request for "${current.title}"`;
-                        const htmlBody = `
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <meta charset="utf-8">
-                            <style>
-                                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0; }
-                                .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                                .header { background-color: #000; padding: 20px; text-align: center; }
-                                .header h1 { color: #fff; margin: 0; font-size: 24px; letter-spacing: 1px; }
-                                .content { padding: 30px; }
-                                .alert-box { background-color: #fff8e1; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px; }
-                                .alert-title { font-weight: bold; color: #d39e00; margin-bottom: 5px; display: block; font-size: 14px; text-transform: uppercase; }
-                                .meta-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-                                .meta-table td { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
-                                .meta-label { font-weight: bold; color: #666; width: 120px; }
-                                .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #eee; }
-                                .button { display: inline-block; background-color: #000; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; margin-top: 20px; }
-                            </style>
-                        </head>
-                        <body>
-                            <div class="container">
-                                <div class="header">
-                                    <h1>DIGITALSIGHT</h1>
-                                </div>
-                                <div class="content">
-                                    <h2 style="margin-top: 0; color: #1a1a1a;">Correction Required</h2>
-                                    <p>Hello,</p>
-                                    <p>The following release has been flagged by our Quality Assurance team and requires your attention before it can be distributed.</p>
-                                    
-                                    <table class="meta-table">
-                                        <tr>
-                                            <td class="meta-label">Release Title</td>
-                                            <td><strong>${current.title}</strong></td>
-                                        </tr>
-                                        <tr>
-                                            <td class="meta-label">UPC</td>
-                                            <td>${current.upc || 'Pending'}</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="meta-label">Submission Date</td>
-                                            <td>${new Date(current.created_at).toLocaleDateString()}</td>
-                                        </tr>
-                                    </table>
-
-                                    <div class="alert-box">
-                                        <span class="alert-title">Correction Directive</span>
-                                        ${note.message}
-                                    </div>
-
-                                    <p>Please log in to the portal to address these issues and resubmit the release.</p>
-                                    
-                                    <div style="text-align: center;">
-                                        <a href="https://app.digitalsight.in/releases/${id}" class="button" style="color: white; text-decoration: none;">Fix Metadata</a>
-                                    </div>
-                                </div>
-                                <div class="footer">
-                                    &copy; ${new Date().getFullYear()} DigitalSight. All rights reserved.<br>
-                                    This is an automated message. Please do not reply directly to this email.
-                                </div>
-                            </div>
-                        </body>
-                        </html>
-                        `;
-                        const textBody = `Correction Required for "${current.title}".\n\nNote: ${note.message}\n\nPlease login to fix: https://app.digitalsight.in/releases/${id}`;
+                        const { subject, html: htmlBody, text: textBody } = getCorrectionEmail(current.title, current.upc, current.created_at, note.message, id);
                         
                         await sendZeptoEmail(env, labelInfo.email, subject, htmlBody, textBody);
                     }
                 } catch (e) {
                     console.error("Correction email failed:", e);
                 }
+            }
+        }
+
+        // Send Publication Email
+        if (data.status === 'Published' && current.status !== 'Published') {
+            try {
+                const labelInfo = await env.DB.prepare(`
+                    SELECT l.name as label_name, u.email
+                    FROM labels l 
+                    JOIN users u ON l.owner_id = u.id 
+                    WHERE l.id = ?
+                `).bind(current.label_id).first() as any;
+
+                if (labelInfo) {
+                    const releaseTitle = data.title || current.title;
+                    const upc = data.upc || current.upc || 'Pending';
+                    const releaseDate = data.releaseDate || current.release_date || 'TBA';
+                    const labelName = labelInfo.label_name;
+
+                    const { subject, html: htmlBody, text: textBody } = getPublicationEmail(releaseTitle, upc, releaseDate, labelName, id);
+
+                    // Fetch all label admins to notify
+                    const { results: admins } = await env.DB.prepare('SELECT email FROM users WHERE label_id = ? AND role IN (\'Label Admin\', \'Sub-Label Admin\')').bind(current.label_id).all();
+
+                    const recipientEmails = admins.map((a: any) => a.email);
+                    if (labelInfo.email && !recipientEmails.includes(labelInfo.email)) {
+                        recipientEmails.push(labelInfo.email);
+                    }
+
+                    for (const email of recipientEmails) {
+                        try {
+                            await sendZeptoEmail(env, email, subject, htmlBody, textBody);
+                        } catch (err) {
+                            console.error(`Failed to send publication email to ${email}:`, err);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Publication email failed:", e);
             }
         }
 
@@ -1212,10 +1420,38 @@ async function authenticate(request: Request, env: Env) {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
   const token = authHeader.split(' ')[1];
   try {
-    return await verifyJwt(token, env.JWT_SECRET);
+    const payload = await verifyJwt(token, env.JWT_SECRET);
+    if (payload && payload.sub) {
+        // Fetch full user from DB to get latest permissions
+        const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(payload.sub).first() as any;
+        if (user) {
+            return {
+                ...payload,
+                role: user.role,
+                permissions: JSON.parse(user.permissions || '{}'),
+                labelId: user.label_id
+            };
+        }
+    }
+    return payload;
   } catch (e) {
     return null;
   }
+}
+
+/**
+ * Admin Middleware: Ensures user is Owner or Employee
+ */
+async function requireAdmin(request: Request, env: Env, corsHeaders: any) {
+    const user = await authenticate(request, env);
+    if (!user) {
+        return { error: new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }) };
+    }
+    const isAdmin = user.role === 'Owner' || user.role === 'Employee';
+    if (!isAdmin) {
+        return { error: new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }) };
+    }
+    return { user };
 }
 
 async function signJwt(payload: any, secret: string) {
@@ -1297,4 +1533,67 @@ function extractFolderName(id: string, artworkUrl?: string, tracks?: any[]) {
         if (relIdx !== -1 && parts[relIdx + 1]) return parts[relIdx + 1];
     }
     return id;
+}
+
+async function handleExportReleases(request: Request, env: Env, corsHeaders: any) {
+    const url = new URL(request.url);
+    const startDate = url.searchParams.get('startDate');
+    const endDate = url.searchParams.get('endDate');
+    const status = url.searchParams.get('status');
+    
+    let query = 'SELECT * FROM releases';
+    const conditions: string[] = [];
+    let params: any[] = [];
+    
+    if (startDate) {
+        conditions.push('created_at >= ?');
+        params.push(startDate);
+    }
+    if (endDate) {
+        conditions.push('created_at <= ?');
+        params.push(endDate + ' 23:59:59');
+    }
+    
+    if (status && status !== 'ALL') {
+        conditions.push('status = ?');
+        params.push(status);
+    }
+    
+    if (conditions.length > 0) {
+        query += ' WHERE ' + conditions.join(' AND ');
+    }
+    
+    const { results: releases } = await env.DB.prepare(query).bind(...params).all();
+    
+    if (releases.length === 0) {
+        return new Response(JSON.stringify([]), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    
+    // Fetch tracks only for these releases to be more efficient
+    // If there are many releases, we might need to batch this, but for export it should be okay
+    const releaseIds = releases.map((r: any) => r.id);
+    
+    // D1 has a limit on parameters, so if we have too many releases we might need to fetch all tracks 
+    // or do it in batches. Let's use a subquery approach which is safer.
+    let tracksQuery = 'SELECT * FROM tracks WHERE release_id IN (SELECT id FROM releases';
+    if (conditions.length > 0) {
+        tracksQuery += ' WHERE ' + conditions.join(' AND ');
+    }
+    tracksQuery += ')';
+    
+    const { results: tracks } = await env.DB.prepare(tracksQuery).bind(...params).all();
+    
+    const tracksByRelease = new Map();
+    tracks.forEach((t: any) => {
+        if (!tracksByRelease.has(t.release_id)) tracksByRelease.set(t.release_id, []);
+        tracksByRelease.get(t.release_id).push(mapTrack(t));
+    });
+    
+    const mappedReleases = releases.map((r: any) => {
+        const mapped = mapRelease(r) as any;
+        mapped.tracks = tracksByRelease.get(r.id) || [];
+        return mapped;
+    });
+    
+    return new Response(JSON.stringify(mappedReleases), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }

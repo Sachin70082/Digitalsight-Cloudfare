@@ -1,73 +1,11 @@
 
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { AppContext } from '../App';
 import { api } from '../services/mockApi';
 import { Release, Artist, UserRole, Notice, NoticeType } from '../types';
-import { Card, CardContent, PageLoader, Badge, Skeleton } from '../components/ui';
-import { CreateReleaseIcon, UserGroupIcon, SpotifyIcon, AppleMusicIcon, ArrowUpIcon, ArrowDownIcon } from '../components/Icons';
-
-const NOTICE_STYLING: Record<NoticeType, string> = {
-    [NoticeType.URGENT]: 'border-red-500/50 bg-red-900/10',
-    [NoticeType.UPDATE]: 'border-blue-500/50 bg-blue-900/10',
-    [NoticeType.POLICY]: 'border-purple-500/50 bg-purple-900/10',
-    [NoticeType.GENERAL]: 'border-green-500/50 bg-green-900/10',
-    [NoticeType.EVENT]: 'border-yellow-500/50 bg-yellow-900/10'
-};
-
-const TopStat = ({ title, value, color = "text-white", loading = false, link }: { title: string, value: string | number, color?: string, loading?: boolean, link?: string }) => {
-    const content = (
-        <div className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 shadow-xl transition-all duration-300 hover:border-primary/20 h-full">
-            <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mb-2 ml-1">{title}</p>
-            {loading ? <Skeleton className="h-9 w-24 rounded-lg" /> : <p className={`text-3xl font-black ${color} tracking-tight`}>{value.toLocaleString()}</p>}
-        </div>
-    );
-    
-    if (link) {
-        return <Link to={link} className="block h-full hover:scale-[1.02] transition-transform">{content}</Link>;
-    }
-    return content;
-};
-
-const NoticesWidget = ({ notices, loading }: { notices: Notice[], loading: boolean }) => (
-    <Card className="h-full">
-        <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                Corporate Board
-            </h3>
-        </div>
-        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-            {loading ? (
-                [...Array(3)].map((_, i) => (
-                    <div key={i} className="p-4 rounded-xl border border-white/5 bg-white/[0.02]">
-                        <div className="flex justify-between mb-2"><Skeleton className="h-2 w-12" /><Skeleton className="h-2 w-16" /></div>
-                        <Skeleton className="h-4 w-3/4 mb-2" />
-                        <Skeleton className="h-3 w-full" />
-                        <Skeleton className="h-3 w-2/3" />
-                    </div>
-                ))
-            ) : notices.length === 0 ? (
-                <div className="py-10 text-center text-gray-500 text-sm">No active board notices.</div>
-            ) : notices.map(notice => (
-                <div key={notice.id} className={`p-4 rounded-xl border-l-4 ${NOTICE_STYLING[notice.type]} transition-transform hover:scale-[1.01] duration-200`}>
-                    <div className="flex justify-between items-start mb-2">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">{notice.type}</span>
-                        <div className="text-right">
-                             <p className="text-[8px] text-gray-500 font-mono leading-none">{new Date(notice.timestamp).toLocaleDateString()}</p>
-                        </div>
-                    </div>
-                    <h4 className="font-bold text-white text-sm mb-1">{notice.title}</h4>
-                    <p className="text-[11px] text-gray-400 leading-relaxed line-clamp-3">{notice.message}</p>
-                    <div className="mt-3 flex items-center gap-2 border-t border-white/5 pt-2">
-                        <div className="w-4 h-4 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[8px] font-bold">{(notice.authorName || 'A').charAt(0)}</div>
-                        <span className="text-[9px] text-gray-500 truncate font-bold uppercase tracking-tight">{notice.authorDesignation || 'System'}</span>
-                    </div>
-                </div>
-            ))}
-        </div>
-    </Card>
-);
+import { PmaFieldset, PmaTable, PmaTR, PmaTD, PmaInfoBar, PmaStatusBadge, PmaLink } from '../components/PmaStyle';
+import { RefreshIcon } from '../components/Icons';
 
 const AdminDashboard: React.FC = () => {
     const { user } = useContext(AppContext);
@@ -83,107 +21,194 @@ const AdminDashboard: React.FC = () => {
     });
     const [notices, setNotices] = useState<Notice[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
    
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [statsData, allNotices] = await Promise.all([
-                    api.getStats(),
-                    api.getNotices(user!)
-                ]);
-                setStats(statsData);
-                setNotices(allNotices.slice(0, 10));
-            } catch (e) {
-                console.error("Failed to load dashboard data", e);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchData();
+    const fetchData = useCallback(async (isManualRefresh = false) => {
+        if (isManualRefresh) setIsRefreshing(true);
+        else setIsLoading(true);
+        
+        try {
+            const [statsData, allNotices] = await Promise.all([
+                api.getStats(),
+                api.getNotices(user!)
+            ]);
+            setStats(statsData);
+            setNotices(allNotices.slice(0, 10));
+        } catch (e) {
+            console.error("Failed to load dashboard data", e);
+        } finally {
+            setIsLoading(false);
+            setIsRefreshing(false);
+        }
     }, [user]);
 
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-gray-800 pb-8">
-                <div>
-                    <h1 className="text-4xl font-black text-white tracking-tighter uppercase">Platform Admin Console</h1>
-                    <p className="text-gray-500 font-medium mt-1">Global Distribution Network Oversight • <span className="text-primary font-bold">{user?.name}</span> ({user?.designation})</p>
-                </div>
-                <div className="flex gap-4">
-                    <Link to="/releases?status=Pending" className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-black font-black uppercase text-[10px] px-6 py-3 rounded-full transition-all tracking-widest shadow-xl shadow-primary/20">
-                        Review Queue {stats.pending > 0 && <span className="bg-black text-primary px-1.5 rounded-full text-[8px]">{stats.pending}</span>}
-                    </Link>
-                    {user?.role === UserRole.OWNER && (
-                        <Link to="/labels" className="bg-gray-800 hover:bg-gray-700 text-white font-black uppercase text-[10px] px-6 py-3 rounded-full transition-all tracking-widest border border-gray-700">
-                            Partner Network
-                        </Link>
+        <div className="space-y-4">
+            {/* Server status info bar */}
+            <PmaInfoBar>
+                <strong>Server:</strong> DigitalSight Distribution Platform &nbsp;|&nbsp; 
+                <strong>Database:</strong> Production &nbsp;|&nbsp; 
+                <strong>Version:</strong> 1.0.0 &nbsp;|&nbsp;
+                <span className="text-[#009900]">● All systems operational</span>
+            </PmaInfoBar>
+
+            {/* Statistics Tables - phpMyAdmin style */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Release Statistics Table */}
+                <PmaFieldset 
+                    legend="Release Statistics"
+                    className="relative"
+                >
+                    <div className="absolute top-[-18px] right-2 flex items-center gap-1.5">
+                        <span className="text-[9px] font-bold text-[#666] uppercase tracking-tighter">Refresh</span>
+                        <button 
+                            onClick={() => fetchData(true)}
+                            disabled={isLoading || isRefreshing}
+                            className={`p-1 rounded-full bg-[#f5f5f5] border border-[#ccc] hover:border-[#0066cc] hover:bg-[#e5f3ff] transition-all shadow-sm active:shadow-inner ${isRefreshing ? 'animate-spin' : ''}`}
+                            title="Refresh Statistics"
+                        >
+                            <RefreshIcon className="w-3 h-3 text-[#0066cc]" />
+                        </button>
+                    </div>
+                    <PmaTable
+                        headers={[
+                            { label: 'Status' },
+                            { label: 'Count', className: 'text-right' },
+                            { label: 'Action', className: 'text-center' }
+                        ]}
+                    >
+                        <PmaTR>
+                            <PmaTD isLabel>📝 Drafted</PmaTD>
+                            <PmaTD className="text-right font-mono font-bold text-[#0066cc]">{isLoading ? '...' : stats.drafted.toLocaleString()}</PmaTD>
+                            <PmaTD className="text-center">
+                                <Link to="/releases?status=Draft" className="text-[#0066cc] hover:underline text-xs">Browse</Link>
+                            </PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>✅ Published</PmaTD>
+                            <PmaTD className="text-right font-mono font-bold text-[#009900]">{isLoading ? '...' : stats.published.toLocaleString()}</PmaTD>
+                            <PmaTD className="text-center">
+                                <Link to="/releases?status=Published" className="text-[#0066cc] hover:underline text-xs">Browse</Link>
+                            </PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>⏳ Pending Review</PmaTD>
+                            <PmaTD className="text-right font-mono font-bold text-[#ff9900]">{isLoading ? '...' : stats.pending.toLocaleString()}</PmaTD>
+                            <PmaTD className="text-center">
+                                <Link to="/releases?status=Pending" className="text-[#0066cc] hover:underline text-xs">Review</Link>
+                            </PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>❌ Rejected</PmaTD>
+                            <PmaTD className="text-right font-mono font-bold text-[#cc0000]">{isLoading ? '...' : stats.rejected.toLocaleString()}</PmaTD>
+                            <PmaTD className="text-center">
+                                <Link to="/releases?status=Rejected" className="text-[#0066cc] hover:underline text-xs">Browse</Link>
+                            </PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>🔧 Needs Correction</PmaTD>
+                            <PmaTD className="text-right font-mono font-bold text-[#cc6600]">{isLoading ? '...' : stats.correction.toLocaleString()}</PmaTD>
+                            <PmaTD className="text-center">
+                                <Link to="/releases?status=Needs Info" className="text-[#0066cc] hover:underline text-xs">Browse</Link>
+                            </PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>🚫 Taken Down</PmaTD>
+                            <PmaTD className="text-right font-mono font-bold text-[#990000]">{isLoading ? '...' : stats.takedown.toLocaleString()}</PmaTD>
+                            <PmaTD className="text-center">
+                                <Link to="/releases?status=Takedown" className="text-[#0066cc] hover:underline text-xs">Browse</Link>
+                            </PmaTD>
+                        </PmaTR>
+                    </PmaTable>
+                </PmaFieldset>
+
+                {/* Entity Statistics Table */}
+                <PmaFieldset legend="Entity Statistics">
+                    <PmaTable
+                        headers={[
+                            { label: 'Entity' },
+                            { label: 'Total', className: 'text-right' },
+                            { label: 'Action', className: 'text-center' }
+                        ]}
+                    >
+                        <PmaTR>
+                            <PmaTD isLabel>🎤 Artists</PmaTD>
+                            <PmaTD className="text-right font-mono font-bold text-[#0066cc]">{isLoading ? '...' : stats.artists.toLocaleString()}</PmaTD>
+                            <PmaTD className="text-center">
+                                <Link to="/artists" className="text-[#0066cc] hover:underline text-xs">Browse</Link>
+                            </PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>🏢 Labels</PmaTD>
+                            <PmaTD className="text-right font-mono font-bold text-[#0066cc]">{isLoading ? '...' : stats.labels.toLocaleString()}</PmaTD>
+                            <PmaTD className="text-center">
+                                <Link to="/labels" className="text-[#0066cc] hover:underline text-xs">Browse</Link>
+                            </PmaTD>
+                        </PmaTR>
+                    </PmaTable>
+                </PmaFieldset>
+            </div>
+
+            {/* Notices Section */}
+            <PmaFieldset legend="📢 Corporate Board Notices">
+                <div className="p-0">
+                    {isLoading ? (
+                        <div className="p-4 text-center text-[#666]">Loading notices...</div>
+                    ) : notices.length === 0 ? (
+                        <div className="p-4 text-center text-[#999]">No active notices.</div>
+                    ) : (
+                        <PmaTable
+                            headers={[
+                                { label: 'Type' },
+                                { label: 'Title' },
+                                { label: 'Author' },
+                                { label: 'Date', className: 'text-right' }
+                            ]}
+                        >
+                            {notices.map(notice => (
+                                <PmaTR key={notice.id}>
+                                    <PmaTD>
+                                        <PmaStatusBadge status={notice.type} />
+                                    </PmaTD>
+                                    <PmaTD isLabel>
+                                        <div className="font-medium text-black">{notice.title}</div>
+                                        <div className="text-xs text-[#444] truncate max-w-xs">{notice.message}</div>
+                                    </PmaTD>
+                                    <PmaTD className="text-black">{notice.authorName || 'System'}</PmaTD>
+                                    <PmaTD className="text-right text-black text-xs">{new Date(notice.timestamp).toLocaleDateString()}</PmaTD>
+                                </PmaTR>
+                            ))}
+                        </PmaTable>
                     )}
                 </div>
-            </div>
+            </PmaFieldset>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-                <TopStat title="Artists" value={stats.artists} link="/artists" loading={isLoading} />
-                <TopStat title="Labels" value={stats.labels} link="/labels" color="text-blue-400" loading={isLoading} />
-                <TopStat title="Drafted" value={stats.drafted} link="/releases?status=Draft" color="text-gray-400" loading={isLoading} />
-                <TopStat title="Published" value={stats.published} link="/releases?status=Published" color="text-green-500" loading={isLoading} />
-                <TopStat title="Rejected" value={stats.rejected} link="/releases?status=Rejected" color="text-red-500" loading={isLoading} />
-                <TopStat title="Correction" value={stats.correction} link="/releases?status=Needs Info" color="text-yellow-500" loading={isLoading} />
-                <TopStat title="Taken Down" value={stats.takedown} link="/releases?status=Takedown" color="text-red-700" loading={isLoading} />
-                <TopStat title="Pending" value={stats.pending} link="/releases?status=Pending" color="text-blue-500" loading={isLoading} />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                    <Card className="bg-gradient-to-br from-gray-800 to-black border-gray-700 shadow-2xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -mr-20 -mt-20 group-hover:bg-primary/10 transition-colors"></div>
-                        <CardContent className="pt-6 relative z-10">
-                            <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Distribution Engine Status</h2>
-                            <p className="text-gray-400 max-w-lg leading-relaxed text-sm">Monitoring ingest queues and metadata compliance globally across {isLoading ? '...' : stats.labels} primary distribution nodes.</p>
-                            
-                            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Link to="/correction-queue" className="flex items-center justify-between p-4 bg-gray-900/60 rounded-xl border border-gray-700 hover:border-yellow-500/50 transition-all">
-                                    <div>
-                                        <p className="text-xs font-bold text-white">Correction Queue</p>
-                                        <p className="text-[10px] text-gray-500 mt-0.5 uppercase tracking-widest">Returned Assets</p>
-                                    </div>
-                                    <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                </Link>
-                                <Link to="/accounting" className="flex items-center justify-between p-4 bg-gray-900/60 rounded-xl border border-gray-700 hover:border-blue-500/50 transition-all">
-                                    <div>
-                                        <p className="text-xs font-bold text-white">Financial Explorer</p>
-                                        <p className="text-[10px] text-gray-500 mt-0.5 uppercase tracking-widest">Revenue Analytics</p>
-                                    </div>
-                                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                                </Link>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {(user?.role === UserRole.OWNER || user?.permissions?.canManageNetwork) && (
-                            <Link to="/network" className="group bg-gray-800 p-6 rounded-2xl border border-gray-800 hover:border-primary/50 transition-all shadow-xl">
-                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary mb-4 group-hover:scale-110 transition-transform">
-                                    <UserGroupIcon className="w-6 h-6" />
-                                </div>
-                                <h4 className="text-white font-bold text-lg">Network Architecture</h4>
-                                <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest font-black">Hierarchy Explorer</p>
+            {/* Admin Tools Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(user?.role === UserRole.OWNER || user?.permissions?.canManageNetwork) && (
+                    <PmaFieldset legend="🌐 Network Administration">
+                        <div className="p-3">
+                            <Link to="/network" className="inline-flex items-center gap-2 bg-gradient-to-b from-[#f7f7f7] to-[#e5e5e5] border-2 border-[#ccc] px-4 py-2 rounded hover:border-[#0066cc] text-sm text-[#333] font-bold">
+                                <span>📁</span>
+                                <span>Network Hierarchy</span>
                             </Link>
-                        )}
-                        {(user?.role === UserRole.OWNER || user?.permissions?.canManageEmployees) && (
-                            <Link to="/employees" className="group bg-gray-800 p-6 rounded-2xl border border-gray-800 hover:border-primary/50 transition-all shadow-xl">
-                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary mb-4 group-hover:scale-110 transition-transform">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                                </div>
-                                <h4 className="text-white font-bold text-lg">Platform Personnel</h4>
-                                <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest font-black">Staff Control Center</p>
+                        </div>
+                    </PmaFieldset>
+                )}
+                {(user?.role === UserRole.OWNER || user?.permissions?.canManageEmployees) && (
+                    <PmaFieldset legend="👥 Personnel Management">
+                        <div className="p-3">
+                            <Link to="/employees" className="inline-flex items-center gap-2 bg-gradient-to-b from-[#f7f7f7] to-[#e5e5e5] border-2 border-[#ccc] px-4 py-2 rounded hover:border-[#0066cc] text-sm text-[#333] font-bold">
+                                <span>👤</span>
+                                <span>Manage Employees</span>
                             </Link>
-                        )}
-                    </div>
-                </div>
-
-                <div className="lg:col-span-1">
-                    <NoticesWidget notices={notices} loading={isLoading} />
-                </div>
+                        </div>
+                    </PmaFieldset>
+                )}
             </div>
         </div>
     );
@@ -204,73 +229,101 @@ const PartnerDashboard: React.FC = () => {
         pending: 0 
     });
     const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const fetchData = useCallback(async (isManualRefresh = false) => {
+        if (isManualRefresh) setIsRefreshing(true);
+        else setIsLoading(true);
+
+        try {
+            const [myReleases, allNotices, statsData] = await Promise.all([
+                api.getReleasesByLabel(user?.labelId || ''),
+                api.getNotices(user!),
+                api.getStats(user?.labelId)
+            ]);
+            setReleases(myReleases.slice(0, 5));
+            setNotices(allNotices.slice(0, 10));
+            setStats(statsData);
+        } catch (e) {
+            console.error("Failed to load dashboard data", e);
+        } finally {
+            setIsLoading(false);
+            setIsRefreshing(false);
+        }
+    }, [user]);
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [myReleases, allNotices, statsData] = await Promise.all([
-                    api.getReleasesByLabel(user?.labelId || ''),
-                    api.getNotices(user!),
-                    api.getStats(user?.labelId)
-                ]);
-                setReleases(myReleases.slice(0, 5));
-                setNotices(allNotices.slice(0, 10));
-                setStats(statsData);
-            } catch (e) {
-                console.error("Failed to load dashboard data", e);
-            } finally {
-                setIsLoading(false);
-            }
-        };
         fetchData();
-    }, [user]);
+    }, [fetchData]);
 
     return (
         <div className="space-y-6 animate-fade-in">
+             <div className="flex justify-between items-end mb-2">
+                <div>
+                    <h2 className="text-xs font-black text-gray-500 uppercase tracking-[0.2em] mb-1">Release Statistics</h2>
+                    <div className="h-1 w-12 bg-primary rounded-full"></div>
+                </div>
+                <button 
+                    onClick={() => fetchData(true)}
+                    disabled={isLoading || isRefreshing}
+                    className={`group flex items-center gap-2.5 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-all shadow-lg ${isRefreshing ? 'opacity-50' : ''}`}
+                >
+                    <RefreshIcon className={`w-3.5 h-3.5 transition-transform duration-500 group-hover:rotate-180 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    <span>{isRefreshing ? 'Refreshing...' : 'Refresh Data'}</span>
+                </button>
+             </div>
              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                <TopStat title="Artists" value={stats.artists} link="/artists" loading={isLoading} />
-                <TopStat title="Drafted" value={stats.drafted} link="/releases?status=Draft" color="text-gray-400" loading={isLoading} />
-                <TopStat title="Published" value={stats.published} link="/releases?status=Published" color="text-green-500" loading={isLoading} />
-                <TopStat title="Rejected" value={stats.rejected} link="/releases?status=Rejected" color="text-red-500" loading={isLoading} />
-                <TopStat title="Correction" value={stats.correction} link="/releases?status=Needs Info" color="text-yellow-500" loading={isLoading} />
-                <TopStat title="Taken Down" value={stats.takedown} link="/releases?status=Takedown" color="text-red-700" loading={isLoading} />
-                <TopStat title="Pending" value={stats.pending} link="/releases?status=Pending" color="text-blue-500" loading={isLoading} />
+                <div className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 shadow-xl transition-all duration-300 hover:border-primary/20 h-full">
+                    <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mb-2 ml-1">Artists</p>
+                    <p className="text-3xl font-black text-white tracking-tight">{isLoading ? '...' : stats.artists.toLocaleString()}</p>
+                </div>
+                <div className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 shadow-xl transition-all duration-300 hover:border-primary/20 h-full">
+                    <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mb-2 ml-1">Drafted</p>
+                    <p className="text-3xl font-black text-gray-400 tracking-tight">{isLoading ? '...' : stats.drafted.toLocaleString()}</p>
+                </div>
+                <div className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 shadow-xl transition-all duration-300 hover:border-primary/20 h-full">
+                    <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mb-2 ml-1">Published</p>
+                    <p className="text-3xl font-black text-green-500 tracking-tight">{isLoading ? '...' : stats.published.toLocaleString()}</p>
+                </div>
+                <div className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 shadow-xl transition-all duration-300 hover:border-primary/20 h-full">
+                    <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mb-2 ml-1">Rejected</p>
+                    <p className="text-3xl font-black text-red-500 tracking-tight">{isLoading ? '...' : stats.rejected.toLocaleString()}</p>
+                </div>
+                <div className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 shadow-xl transition-all duration-300 hover:border-primary/20 h-full">
+                    <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mb-2 ml-1">Correction</p>
+                    <p className="text-3xl font-black text-yellow-500 tracking-tight">{isLoading ? '...' : stats.correction.toLocaleString()}</p>
+                </div>
+                <div className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 shadow-xl transition-all duration-300 hover:border-primary/20 h-full">
+                    <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mb-2 ml-1">Taken Down</p>
+                    <p className="text-3xl font-black text-red-700 tracking-tight">{isLoading ? '...' : stats.takedown.toLocaleString()}</p>
+                </div>
+                <div className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 shadow-xl transition-all duration-300 hover:border-primary/20 h-full">
+                    <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mb-2 ml-1">Pending</p>
+                    <p className="text-3xl font-black text-blue-500 tracking-tight">{isLoading ? '...' : stats.pending.toLocaleString()}</p>
+                </div>
             </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
-                    <Card className="bg-gradient-to-br from-primary/10 to-transparent">
-                        <CardContent className="pt-2">
-                            <h2 className="text-3xl font-black text-white mb-2 tracking-tight uppercase">Partner Portal</h2>
-                            <p className="text-gray-400 text-sm font-medium">Welcome back, {user?.name}. Distribution oversight for <span className="text-primary font-bold uppercase tracking-tight">{user?.role}</span> accounts is active.</p>
-                            <div className="mt-8 flex gap-3">
-                                <Link to="/releases" className="bg-primary text-black font-black uppercase text-[10px] px-8 py-4 rounded-xl tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/20">My Catalog</Link>
-                                {user?.role !== UserRole.ARTIST && (
-                                    <Link to="/artists" className="bg-white/5 text-white font-black uppercase text-[10px] px-8 py-4 rounded-xl tracking-widest hover:bg-white/10 transition-all border border-white/10">Manage Artists</Link>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <div className="bg-gradient-to-br from-primary/10 to-transparent p-6 rounded-2xl border border-gray-800">
+                        <h2 className="text-3xl font-black text-white mb-2 tracking-tight uppercase">Partner Portal</h2>
+                        <p className="text-gray-400 text-sm font-medium">Welcome back, {user?.name}. Distribution oversight for <span className="text-primary font-bold uppercase tracking-tight">{user?.role}</span> accounts is active.</p>
+                        <div className="mt-8 flex gap-3">
+                            <Link to="/releases" className="bg-primary text-black font-black uppercase text-[10px] px-8 py-4 rounded-xl tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/20">My Catalog</Link>
+                            {user?.role !== UserRole.ARTIST && (
+                                <Link to="/artists" className="bg-white/5 text-white font-black uppercase text-[10px] px-8 py-4 rounded-xl tracking-widest hover:bg-white/10 transition-all border border-white/10">Manage Artists</Link>
+                            )}
+                        </div>
+                    </div>
 
-                    <Card>
+                    <div className="bg-gray-900 p-6 rounded-2xl border border-gray-800">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-black text-white uppercase text-[10px] tracking-[0.2em] text-gray-500">Distribution Activity</h3>
                             <Link to="/releases" className="text-[10px] text-primary hover:underline font-black uppercase tracking-wider">Full Catalog</Link>
                         </div>
                         <div className="space-y-4">
                             {isLoading ? (
-                                [...Array(3)].map((_, i) => (
-                                    <div key={i} className="flex items-center justify-between p-3 bg-gray-900/50 rounded-xl border border-gray-800/50">
-                                        <div className="flex items-center gap-4">
-                                            <Skeleton className="w-10 h-10 rounded" />
-                                            <div className="space-y-1">
-                                                <Skeleton className="h-3 w-32" />
-                                                <Skeleton className="h-2 w-20" />
-                                            </div>
-                                        </div>
-                                        <Skeleton className="h-5 w-16 rounded-full" />
-                                    </div>
-                                ))
+                                <div className="text-center text-gray-500 py-8">Loading...</div>
                             ) : releases.length === 0 ? (
                                 <div className="py-12 text-center text-gray-600">No releases in your catalog yet.</div>
                             ) : releases.map(rel => (
@@ -290,15 +343,48 @@ const PartnerDashboard: React.FC = () => {
                                             <p className="text-[10px] text-gray-500 font-mono mt-0.5">CAT: {rel.catalogueNumber}</p>
                                         </div>
                                     </div>
-                                    <Badge status={rel.status} />
+                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                        rel.status === 'Published' ? 'bg-green-900/50 text-green-400' :
+                                        rel.status === 'Pending' ? 'bg-yellow-900/50 text-yellow-400' :
+                                        rel.status === 'Rejected' ? 'bg-red-900/50 text-red-400' :
+                                        'bg-gray-800 text-gray-400'
+                                    }`}>
+                                        {rel.status}
+                                    </span>
                                 </Link>
                             ))}
                         </div>
-                    </Card>
+                    </div>
                 </div>
                 
                 <div className="lg:col-span-1">
-                    <NoticesWidget notices={notices} loading={isLoading} />
+                    <div className="bg-gray-900 p-6 rounded-2xl border border-gray-800">
+                        <h3 className="text-lg font-bold text-white mb-4">📢 Notices</h3>
+                        {isLoading ? (
+                            <div className="text-center text-gray-500 py-4">Loading...</div>
+                        ) : notices.length === 0 ? (
+                            <div className="text-center text-gray-500 py-4">No notices.</div>
+                        ) : (
+                            <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                                {notices.slice(0, 5).map(notice => (
+                                    <div key={notice.id} className="p-3 bg-gray-800/50 rounded-lg">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                notice.type === NoticeType.URGENT ? 'bg-red-900/50 text-red-400' :
+                                                notice.type === NoticeType.UPDATE ? 'bg-blue-900/50 text-blue-400' :
+                                                'bg-gray-700 text-gray-300'
+                                            }`}>
+                                                {notice.type}
+                                            </span>
+                                            <span className="text-[10px] text-gray-500">{new Date(notice.timestamp).toLocaleDateString()}</span>
+                                        </div>
+                                        <p className="text-sm text-white font-medium">{notice.title}</p>
+                                        <p className="text-xs text-gray-400 mt-1">{notice.message}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

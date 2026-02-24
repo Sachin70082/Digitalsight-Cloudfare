@@ -1,7 +1,8 @@
 
-import React, { ReactNode } from 'react';
-import { ReleaseStatus } from '../types';
+import React, { ReactNode, useContext } from 'react';
+import { ReleaseStatus, UserRole } from '../types';
 import { STATUS_COLORS } from '../constants';
+import { AppContext } from '../App';
 
 // --- Badge ---
 interface BadgeProps {
@@ -99,10 +100,30 @@ interface ModalProps {
     size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
 }
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'lg' }) => {
+    const { user } = useContext(AppContext);
     if (!isOpen) return null;
+    
+    const isPlatformSide = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
     const sizeClasses = {
         sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl', '2xl': 'max-w-2xl', '3xl': 'max-w-3xl', '4xl': 'max-w-4xl', '5xl': 'max-w-5xl'
     }
+
+    if (isPlatformSide) {
+        return (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 sm:p-6 animate-fade-in" style={{ fontFamily: 'Verdana, Arial, Helvetica, sans-serif' }}>
+                <div className={`bg-white border border-[#aaa] rounded shadow-2xl w-full ${sizeClasses[size]} flex flex-col max-h-[90vh] relative overflow-hidden`}>
+                    <div className="flex justify-between items-center px-3 py-1 border-b border-[#aaa] bg-gradient-to-b from-[#f7f7f7] to-[#e5e5e5] flex-shrink-0">
+                        <h3 className="text-xs font-bold text-[#333]">{title}</h3>
+                        <button onClick={onClose} className="text-[#666] hover:text-[#cc0000] text-xl leading-none font-bold">&times;</button>
+                    </div>
+                    <div className="p-3 overflow-y-auto custom-scrollbar flex-grow bg-[#f5f5f5]">
+                        {children}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-xl flex items-center justify-center z-[9999] p-4 sm:p-6 animate-fade-in">
             <div className={`bg-gray-900 border border-white/10 rounded-[2rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.9)] w-full ${sizeClasses[size]} flex flex-col max-h-[90vh] relative overflow-hidden`}>

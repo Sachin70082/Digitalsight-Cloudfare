@@ -1,16 +1,336 @@
-
 import React, { useEffect, useState, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/mockApi';
 import { Release, Track, Artist, Label, InteractionNote, UserRole } from '../types';
 import { AppContext } from '../App';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '../components/ui';
+import { PmaFieldset, PmaTable, PmaTR, PmaTD, PmaButton, PmaStatusBadge, PmaInfoBar, PmaAudioPlayer } from '../components/PmaStyle';
 import {
     ArrowLeftIcon, MusicIcon, SpotifyIcon, AppleMusicIcon, YouTubeMusicIcon,
     AmazonMusicIcon, JioSaavnIcon, ShazamIcon, TidalIcon, TikTokIcon,
     FacebookIcon, InstagramIcon, SoundCloudIcon
 } from '../components/Icons';
 
+const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+};
+
+// phpMyAdmin style Release Detail for admin users
+const PmaReleaseDetailView: React.FC<{
+    release: Release;
+    artist: Artist | null;
+    label: Label | null;
+    allArtists: Map<string, Artist>;
+    isStaff: boolean;
+    onBack: () => void;
+    onPlayTrack: (src: string, title: string) => void;
+    playingTrack: { src: string, title: string } | null;
+    setPlayingTrack: (t: { src: string, title: string } | null) => void;
+}> = ({ release, artist, label, allArtists, isStaff, onBack, onPlayTrack, playingTrack, setPlayingTrack }) => {
+    return (
+        <div className="space-y-4 pb-20">
+            <PmaInfoBar>
+                <strong>Table:</strong> releases &nbsp;|&nbsp; 
+                <strong>Row:</strong> {release.id} &nbsp;|&nbsp;
+                <strong>Status:</strong> <PmaStatusBadge status={release.status} />
+            </PmaInfoBar>
+
+            {/* Header with back button */}
+            <div className="flex items-center gap-4 mb-4">
+                <button onClick={onBack} className="text-[#0066cc] hover:underline text-sm flex items-center gap-1">
+                    ← Back to list
+                </button>
+            </div>
+
+            {/* Main Info */}
+            <PmaFieldset legend={`Release: ${release.title}`}>
+                <div className="p-4">
+                    <div className="flex gap-6 mb-6">
+                        {/* Cover Art */}
+                        <div className="w-48 h-48 border-2 border-[#ccc] flex-shrink-0">
+                            <img src={release.artworkUrl} alt="Cover" className="w-full h-full object-cover" />
+                        </div>
+                        
+                        {/* Basic Info */}
+                        <div className="flex-1">
+                            <PmaTable headers={[{ label: 'Field' }, { label: 'Value' }]}>
+                                <PmaTR>
+                                    <PmaTD isLabel>Title</PmaTD>
+                                    <PmaTD className="text-black">{release.title}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Primary Artists</PmaTD>
+                                    <PmaTD className="text-black">{(release.primaryArtistIds || []).map(id => allArtists.get(id)?.name).filter(Boolean).join(', ') || 'Unknown'}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Status</PmaTD>
+                                    <PmaTD><PmaStatusBadge status={release.status} /></PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>UPC</PmaTD>
+                                    <PmaTD className="font-mono text-black">{release.upc || 'Pending'}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Catalogue Number</PmaTD>
+                                    <PmaTD className="text-black">{release.catalogueNumber || '-'}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Release Date</PmaTD>
+                                    <PmaTD className="text-black">{release.releaseDate || '-'}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Release Type</PmaTD>
+                                    <PmaTD className="text-black">{release.releaseType || '-'}</PmaTD>
+                                </PmaTR>
+                            </PmaTable>
+                        </div>
+                    </div>
+                </div>
+            </PmaFieldset>
+
+            {/* Label Info (Staff only) */}
+            {isStaff && label && (
+                <PmaFieldset legend="Label Information">
+                    <div className="p-4">
+                        <PmaTable headers={[{ label: 'Field' }, { label: 'Value' }]}>
+                            <PmaTR>
+                                <PmaTD isLabel>Label ID</PmaTD>
+                                <PmaTD className="font-mono">{label.id}</PmaTD>
+                            </PmaTR>
+                            <PmaTR>
+                                <PmaTD isLabel>Label Name</PmaTD>
+                                <PmaTD>{label.name}</PmaTD>
+                            </PmaTR>
+                            <PmaTR>
+                                <PmaTD isLabel>Owner Email</PmaTD>
+                                <PmaTD>{label.ownerEmail}</PmaTD>
+                            </PmaTR>
+                        </PmaTable>
+                    </div>
+                </PmaFieldset>
+            )}
+
+            {/* Metadata */}
+            <PmaFieldset legend="Metadata">
+                <div className="p-4">
+                    <PmaTable headers={[{ label: 'Field' }, { label: 'Value' }]}>
+                        <PmaTR>
+                            <PmaTD isLabel>Genre</PmaTD>
+                            <PmaTD className="text-black">{release.genre || '-'}</PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>Mood</PmaTD>
+                            <PmaTD className="text-black">{release.mood || '-'}</PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>Language</PmaTD>
+                            <PmaTD className="text-black">{release.language || '-'}</PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>P-Line</PmaTD>
+                            <PmaTD className="text-black">{release.pLine || '-'}</PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>C-Line</PmaTD>
+                            <PmaTD className="text-black">{release.cLine || '-'}</PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>Explicit</PmaTD>
+                            <PmaTD className="text-black">{release.explicit ? 'Yes' : 'No'}</PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>Publisher</PmaTD>
+                            <PmaTD className="text-black">{release.publisher || '-'}</PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>YouTube Content ID</PmaTD>
+                            <PmaTD className="text-black">{release.youtubeContentId ? 'Enabled' : 'Disabled'}</PmaTD>
+                        </PmaTR>
+                        <PmaTR>
+                            <PmaTD isLabel>Created At</PmaTD>
+                            <PmaTD className="text-black">{new Date(release.createdAt).toLocaleString()}</PmaTD>
+                        </PmaTR>
+                    </PmaTable>
+                </div>
+            </PmaFieldset>
+
+            {/* Film Info */}
+            {(release.filmName || release.filmDirector) && (
+                <PmaFieldset legend="Production / Film Sync Data">
+                    <div className="p-4">
+                        <PmaTable headers={[{ label: 'Field' }, { label: 'Value' }]}>
+                            {release.filmName && (
+                                <PmaTR>
+                                    <PmaTD isLabel>Production Name</PmaTD>
+                                    <PmaTD>{release.filmName}</PmaTD>
+                                </PmaTR>
+                            )}
+                            {release.filmDirector && (
+                                <PmaTR>
+                                    <PmaTD isLabel>Director</PmaTD>
+                                    <PmaTD>{release.filmDirector}</PmaTD>
+                                </PmaTR>
+                            )}
+                            {release.filmProducer && (
+                                <PmaTR>
+                                    <PmaTD isLabel>Producer</PmaTD>
+                                    <PmaTD>{release.filmProducer}</PmaTD>
+                                </PmaTR>
+                            )}
+                            {release.filmBanner && (
+                                <PmaTR>
+                                    <PmaTD isLabel>Banner</PmaTD>
+                                    <PmaTD>{release.filmBanner}</PmaTD>
+                                </PmaTR>
+                            )}
+                            {release.filmCast && (
+                                <PmaTR>
+                                    <PmaTD isLabel>Lead Cast</PmaTD>
+                                    <PmaTD>{release.filmCast}</PmaTD>
+                                </PmaTR>
+                            )}
+                            {release.originalReleaseDate && (
+                                <PmaTR>
+                                    <PmaTD isLabel>Original Year</PmaTD>
+                                    <PmaTD>{release.originalReleaseDate}</PmaTD>
+                                </PmaTR>
+                            )}
+                        </PmaTable>
+                    </div>
+                </PmaFieldset>
+            )}
+
+            {/* Tracklist */}
+            <PmaFieldset legend={`Tracklist (${(release.tracks || []).length} tracks)`}>
+                <div className="p-4">
+                    <PmaTable
+                        headers={[
+                            { label: '#', className: 'w-12' },
+                            { label: 'Title' },
+                            { label: 'Artists' },
+                            { label: 'Duration', className: 'text-right' },
+                            { label: 'ISRC' },
+                            { label: 'Composer / Lyricist' },
+                            { label: 'Explicit', className: 'text-center' },
+                            { label: 'Audio', className: 'text-center' }
+                        ]}
+                    >
+                        {(release.tracks || []).map((track: Track) => {
+                            const primaryArtists = (track.primaryArtistIds || []).map(id => allArtists.get(id)?.name).filter(Boolean).join(', ');
+                            const featuredArtists = (track.featuredArtistIds || []).map(id => allArtists.get(id)?.name).filter(Boolean).join(', ');
+                            const artists = primaryArtists + (featuredArtists ? ` (feat. ${featuredArtists})` : '');
+
+                            return (
+                                <PmaTR key={track.id}>
+                                    <PmaTD className="text-center text-black">{track.trackNumber}</PmaTD>
+                                    <PmaTD isLabel className="text-black">
+                                        <div>{track.title}</div>
+                                        <div className="text-[9px] text-[#666]">{track.versionTitle || '-'}</div>
+                                    </PmaTD>
+                                    <PmaTD className="text-xs text-black">{artists || '-'}</PmaTD>
+                                    <PmaTD className="text-right font-mono text-black text-xs">{formatDuration(track.duration)}</PmaTD>
+                                    <PmaTD className="font-mono text-xs text-black">{track.isrc || '-'}</PmaTD>
+                                    <PmaTD className="text-black">
+                                        <div className="text-[10px]">{track.composer || '-'}</div>
+                                        <div className="text-[9px] text-[#666]">{track.lyricist || '-'}</div>
+                                    </PmaTD>
+                                    <PmaTD className="text-center text-black">
+                                        {track.explicit ? <span className="text-[#cc0000] font-bold">Yes</span> : 'No'}
+                                    </PmaTD>
+                                    <PmaTD className="text-center">
+                                        <PmaButton 
+                                            variant={playingTrack?.src === track.audioUrl ? 'primary' : 'secondary'}
+                                            onClick={() => onPlayTrack(track.audioUrl, track.title)}
+                                            className="px-2 py-0.5 text-[10px]"
+                                        >
+                                            {playingTrack?.src === track.audioUrl ? 'Playing...' : 'Play'}
+                                        </PmaButton>
+                                    </PmaTD>
+                                </PmaTR>
+                            );
+                        })}
+                    </PmaTable>
+                </div>
+            </PmaFieldset>
+
+            {/* Description */}
+            <PmaFieldset legend="Marketing Copy / Liner Notes">
+                <div className="p-4">
+                    <div className="border border-[#aaa] p-4 bg-white min-h-[100px] text-black text-sm">
+                        {release.description || <span className="text-[#999]">No description provided.</span>}
+                    </div>
+                </div>
+            </PmaFieldset>
+
+            {/* Distribution Platforms */}
+            <PmaFieldset legend="Distribution Platforms">
+                <div className="p-4">
+                    <div className="flex flex-wrap gap-3">
+                        {[
+                            { name: 'Spotify', icon: SpotifyIcon },
+                            { name: 'Apple Music', icon: AppleMusicIcon },
+                            { name: 'YouTube Music', icon: YouTubeMusicIcon },
+                            { name: 'Amazon Music', icon: AmazonMusicIcon },
+                            { name: 'JioSaavn', icon: JioSaavnIcon },
+                            { name: 'Shazam', icon: ShazamIcon },
+                            { name: 'Tidal', icon: TidalIcon },
+                            { name: 'TikTok', icon: TikTokIcon },
+                            { name: 'Facebook', icon: FacebookIcon },
+                            { name: 'Instagram', icon: InstagramIcon },
+                            { name: 'SoundCloud', icon: SoundCloudIcon },
+                        ].map((platform) => (
+                            <div key={platform.name} className="flex items-center gap-2 border border-[#aaa] px-3 py-1 bg-[#f0f0f0] text-black">
+                                <platform.icon className="w-4 h-4" />
+                                <span className="text-[11px] font-bold">{platform.name}</span>
+                                <span className="text-[10px] text-[#009900]">✓</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </PmaFieldset>
+
+            {/* Audit History */}
+            <PmaFieldset legend="Audit History & Notes">
+                <div className="p-4">
+                    {(!release.notes || release.notes.length === 0) ? (
+                        <p className="text-[#999] text-center py-4">No audit history recorded.</p>
+                    ) : (
+                        <PmaTable headers={[{ label: 'Timestamp' }, { label: 'Author' }, { label: 'Role' }, { label: 'Message' }]}>
+                            {[...release.notes].sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || '')).map((note) => (
+                                <PmaTR key={note.id}>
+                                    <PmaTD className="text-xs font-mono text-black">{new Date(note.timestamp).toLocaleString()}</PmaTD>
+                                    <PmaTD className="text-black">{note.authorName || 'Staff'}</PmaTD>
+                                    <PmaTD>
+                                        <span className={`text-xs px-2 py-0.5 ${
+                                            note.authorRole === UserRole.OWNER || note.authorRole === UserRole.EMPLOYEE
+                                                ? 'bg-[#fff3cd] text-[#856404] border border-[#856404]'
+                                                : 'bg-[#cce5ff] text-[#004085] border border-[#004085]'
+                                        }`}>
+                                            {note.authorRole}
+                                        </span>
+                                    </PmaTD>
+                                    <PmaTD className="text-xs text-black">{note.message}</PmaTD>
+                                </PmaTR>
+                            ))}
+                        </PmaTable>
+                    )}
+                </div>
+            </PmaFieldset>
+
+            {playingTrack && (
+                <PmaAudioPlayer 
+                    src={playingTrack.src} 
+                    title={playingTrack.title} 
+                    onClose={() => setPlayingTrack(null)} 
+                />
+            )}
+        </div>
+    );
+};
+
+// Original dark theme MetaItem for partner view
 const MetaItem: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) => (
     <div className="group/meta">
         <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1 group-hover/meta:text-primary transition-colors">{label}</p>
@@ -18,6 +338,7 @@ const MetaItem: React.FC<{ label: string; value?: React.ReactNode }> = ({ label,
     </div>
 );
 
+// Original dark theme InteractionLog for partner view
 const InteractionLog: React.FC<{ notes: InteractionNote[] }> = ({ notes }) => {
     const sortedNotes = [...(notes || [])].sort((a, b) => 
         (b.timestamp || '').localeCompare(a.timestamp || '')
@@ -55,166 +376,21 @@ const InteractionLog: React.FC<{ notes: InteractionNote[] }> = ({ notes }) => {
     );
 };
 
-const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-};
-
-const ReleaseDetail: React.FC = () => {
-    const { releaseId } = useParams<{ releaseId: string }>();
-    const navigate = useNavigate();
-    
-    const { user } = useContext(AppContext);
-    const isStaff = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
-    
-    const [release, setRelease] = useState<Release | null>(null);
-    const [artist, setArtist] = useState<Artist | null>(null);
-    const [label, setLabel] = useState<Label | null>(null);
-    const [allArtists, setAllArtists] = useState<Map<string, Artist>>(new Map());
-    
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        if (!releaseId) return;
-
-        const fetchData = async () => {
-            setIsLoading(true);
-            try {
-                const releaseData = await api.getRelease(releaseId);
-
-                if (!releaseData) {
-                    setRelease(null);
-                    setIsLoading(false);
-                    return;
-                }
-                
-                setRelease(releaseData);
-                // Show main data immediately, don't wait for artists/labels
-                setIsLoading(false);
-
-                // Fetch supporting data in background
-                const [fetchedArtists, labelData] = await Promise.all([
-                    api.getAllArtists(),
-                    releaseData.labelId ? api.getLabel(releaseData.labelId) : Promise.resolve(null)
-                ]);
-
-                const artistMap = new Map<string, Artist>();
-                fetchedArtists.forEach(a => artistMap.set(a.id, a));
-                setAllArtists(artistMap);
-
-                const primaryIds = releaseData.primaryArtistIds || [];
-                if (primaryIds.length > 0) {
-                    setArtist(artistMap.get(primaryIds[0]) || null);
-                }
-
-                setLabel(labelData || null);
-            } catch (error) {
-                console.error("Failed to fetch release details", error);
-                setIsLoading(false);
-            }
-        };
-
-        fetchData();
-    }, [releaseId]);
-
-    if (isLoading) {
-        return (
-            <div className="space-y-8 animate-fade-in w-full pb-20">
-                {/* Header Skeleton */}
-                <div className="flex flex-col md:flex-row justify-between items-start gap-6 border-b border-gray-800 pb-8 px-4">
-                    <div className="flex items-center gap-6">
-                        <Skeleton className="w-12 h-12 rounded-2xl" />
-                        <div>
-                            <Skeleton className="h-10 w-64 mb-2" />
-                            <Skeleton className="h-4 w-48" />
-                        </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                        <Skeleton className="h-6 w-24 rounded-full" />
-                        <Skeleton className="h-3 w-32" />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4">
-                    {/* Left Column */}
-                    <div className="lg:col-span-3 space-y-8">
-                        {/* Cover Art Skeleton */}
-                        <Card className="p-0 overflow-hidden border-none bg-transparent shadow-none">
-                             <Skeleton className="w-full aspect-square rounded-[2rem]" />
-                        </Card>
-
-                        {/* Audit History Skeleton */}
-                        <Card>
-                            <CardHeader className="border-b border-gray-800/50">
-                                <Skeleton className="h-4 w-32" />
-                            </CardHeader>
-                            <CardContent className="pt-6 space-y-4">
-                                <Skeleton className="h-24 w-full rounded-xl" />
-                                <Skeleton className="h-24 w-full rounded-xl" />
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Right Column */}
-                    <div className="lg:col-span-9 space-y-8">
-                        {/* Metadata Skeleton */}
-                        <Card>
-                            <CardHeader>
-                                <Skeleton className="h-5 w-48" />
-                            </CardHeader>
-                            <CardContent className="pt-2">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-6">
-                                    {[...Array(8)].map((_, i) => (
-                                        <div key={i} className="space-y-2">
-                                            <Skeleton className="h-3 w-24" />
-                                            <Skeleton className="h-4 w-32" />
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Tracklist Skeleton */}
-                        <Card>
-                            <CardHeader>
-                                <Skeleton className="h-5 w-40" />
-                            </CardHeader>
-                            <CardContent className="pt-2 space-y-6">
-                                {[...Array(3)].map((_, i) => (
-                                    <div key={i} className="p-8 bg-white/5 rounded-[2rem] border border-white/5">
-                                        <div className="flex justify-between mb-8">
-                                            <div className="flex gap-6">
-                                                <Skeleton className="w-12 h-12 rounded-2xl" />
-                                                <div className="space-y-2">
-                                                    <Skeleton className="h-8 w-64" />
-                                                    <Skeleton className="h-4 w-48" />
-                                                </div>
-                                            </div>
-                                            <Skeleton className="h-8 w-16" />
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-8">
-                                            <Skeleton className="h-10 w-full" />
-                                            <Skeleton className="h-10 w-full" />
-                                            <Skeleton className="h-10 w-full" />
-                                        </div>
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-    if (!release) return <div className="text-center p-20 text-red-500 font-black uppercase tracking-widest animate-fade-in">Session not found in distribution archive.</div>;
-
+// Partner view (original dark theme)
+const PartnerReleaseDetailView: React.FC<{
+    release: Release;
+    artist: Artist | null;
+    label: Label | null;
+    allArtists: Map<string, Artist>;
+    isStaff: boolean;
+    onBack: () => void;
+}> = ({ release, artist, label, allArtists, isStaff, onBack }) => {
     return (
         <div className="space-y-8 animate-fade-in w-full pb-20 max-w-none">
             <div className="flex flex-col md:flex-row justify-between items-start gap-6 border-b border-gray-800 pb-8 px-4">
                 <div className="flex items-center gap-6">
                     <button 
-                        onClick={() => navigate('/releases')} 
+                        onClick={onBack} 
                         className="w-12 h-12 rounded-2xl bg-gray-800 border border-gray-700 flex items-center justify-center text-gray-400 hover:text-white hover:border-primary/50 transition-all group"
                     >
                         <ArrowLeftIcon className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
@@ -225,34 +401,6 @@ const ReleaseDetail: React.FC = () => {
                             <p className="text-gray-500 font-bold uppercase tracking-widest">
                                 Primary Artists: <span className="text-primary font-black">{(release.primaryArtistIds || []).map(id => allArtists.get(id)?.name).filter(Boolean).join(', ') || 'Unknown'}</span>
                             </p>
-                            <div className="flex flex-wrap items-center gap-4 border-l border-gray-800 pl-4">
-                                {[...(release.primaryArtistIds || []), ...(release.featuredArtistIds || [])].map(id => {
-                                    const a = allArtists.get(id);
-                                    if (!a || (!a.spotifyId && !a.appleMusicId && !a.instagramUrl)) return null;
-                                    return (
-                                        <div key={a.id} className="flex items-center gap-2 bg-white/5 px-2 py-1 rounded-lg border border-white/5">
-                                            <span className="text-[9px] font-black text-gray-400 uppercase truncate max-w-[80px]">{a.name}</span>
-                                            <div className="flex items-center gap-1.5">
-                                                {a.spotifyId && (
-                                                    <a href={`https://open.spotify.com/artist/${a.spotifyId}`} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#1DB954] transition-colors" title={`${a.name} Spotify`}>
-                                                        <SpotifyIcon className="w-3 h-3" />
-                                                    </a>
-                                                )}
-                                                {a.appleMusicId && (
-                                                    <a href={`https://music.apple.com/artist/${a.appleMusicId}`} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#FA243C] transition-colors" title={`${a.name} Apple Music`}>
-                                                        <AppleMusicIcon className="w-3 h-3" />
-                                                    </a>
-                                                )}
-                                                {a.instagramUrl && (
-                                                    <a href={a.instagramUrl.startsWith('http') ? a.instagramUrl : `https://instagram.com/${a.instagramUrl}`} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#E4405F] transition-colors" title={`${a.name} Instagram`}>
-                                                        <InstagramIcon className="w-3 h-3" />
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -286,7 +434,6 @@ const ReleaseDetail: React.FC = () => {
                 </div>
 
                 <div className="lg:col-span-9 space-y-8">
-
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-sm uppercase tracking-widest font-black">Session Metadata Overview</CardTitle>
@@ -358,34 +505,6 @@ const ReleaseDetail: React.FC = () => {
                                                             <p className="text-sm text-gray-500 font-bold uppercase tracking-widest">
                                                                 {primaryArtists} {featuredArtists ? `(feat. ${featuredArtists})` : ''}
                                                             </p>
-                                                            <div className="flex flex-wrap items-center gap-2 border-l border-gray-800 pl-3">
-                                                                {[...(track.primaryArtistIds || []), ...(track.featuredArtistIds || [])].map(id => {
-                                                                    const a = allArtists.get(id);
-                                                                    if (!a || (!a.spotifyId && !a.appleMusicId && !a.instagramUrl)) return null;
-                                                                    return (
-                                                                        <div key={a.id} className="flex items-center gap-1.5 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
-                                                                            <span className="text-[8px] font-black text-gray-500 uppercase truncate max-w-[60px]">{a.name}</span>
-                                                                            <div className="flex items-center gap-1">
-                                                                                {a.spotifyId && (
-                                                                                    <a href={`https://open.spotify.com/artist/${a.spotifyId}`} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#1DB954] transition-colors" title={`${a.name} Spotify`}>
-                                                                                        <SpotifyIcon className="w-2.5 h-2.5" />
-                                                                                    </a>
-                                                                                )}
-                                                                                {a.appleMusicId && (
-                                                                                    <a href={`https://music.apple.com/artist/${a.appleMusicId}`} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#FA243C] transition-colors" title={`${a.name} Apple Music`}>
-                                                                                        <AppleMusicIcon className="w-2.5 h-2.5" />
-                                                                                    </a>
-                                                                                )}
-                                                                                {a.instagramUrl && (
-                                                                                    <a href={a.instagramUrl.startsWith('http') ? a.instagramUrl : `https://instagram.com/${a.instagramUrl}`} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#E4405F] transition-colors" title={`${a.name} Instagram`}>
-                                                                                        <InstagramIcon className="w-2.5 h-2.5" />
-                                                                                    </a>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -467,6 +586,124 @@ const ReleaseDetail: React.FC = () => {
             </div>
         </div>
     );
+};
+
+const ReleaseDetail: React.FC = () => {
+    const { releaseId } = useParams<{ releaseId: string }>();
+    const navigate = useNavigate();
+    
+    const { user } = useContext(AppContext);
+    const isStaff = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
+    const isPlatformSide = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
+    
+    const [release, setRelease] = useState<Release | null>(null);
+    const [artist, setArtist] = useState<Artist | null>(null);
+    const [label, setLabel] = useState<Label | null>(null);
+    const [allArtists, setAllArtists] = useState<Map<string, Artist>>(new Map());
+    
+    const [isLoading, setIsLoading] = useState(true);
+    const [playingTrack, setPlayingTrack] = useState<{ src: string, title: string } | null>(null);
+
+    useEffect(() => {
+        if (!releaseId) return;
+
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                const releaseData = await api.getRelease(releaseId);
+
+                if (!releaseData) {
+                    setRelease(null);
+                    setIsLoading(false);
+                    return;
+                }
+                
+                setRelease(releaseData);
+                setIsLoading(false);
+
+                const [fetchedArtists, labelData] = await Promise.all([
+                    api.getAllArtists(),
+                    releaseData.labelId ? api.getLabel(releaseData.labelId) : Promise.resolve(null)
+                ]);
+
+                const artistMap = new Map<string, Artist>();
+                fetchedArtists.forEach(a => artistMap.set(a.id, a));
+                setAllArtists(artistMap);
+
+                const primaryIds = releaseData.primaryArtistIds || [];
+                if (primaryIds.length > 0) {
+                    setArtist(artistMap.get(primaryIds[0]) || null);
+                }
+
+                setLabel(labelData || null);
+            } catch (error) {
+                console.error("Failed to fetch release details", error);
+                setIsLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [releaseId]);
+
+    if (isLoading) {
+        return (
+            <div className="space-y-8 animate-fade-in w-full pb-20">
+                <div className="flex flex-col md:flex-row justify-between items-start gap-6 border-b border-gray-800 pb-8 px-4">
+                    <div className="flex items-center gap-6">
+                        <Skeleton className="w-12 h-12 rounded-2xl" />
+                        <div>
+                            <Skeleton className="h-10 w-64 mb-2" />
+                            <Skeleton className="h-4 w-48" />
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                        <Skeleton className="h-6 w-24 rounded-full" />
+                        <Skeleton className="h-3 w-32" />
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-4">
+                    <div className="lg:col-span-3 space-y-8">
+                        <Card className="p-0 overflow-hidden border-none bg-transparent shadow-none">
+                             <Skeleton className="w-full aspect-square rounded-[2rem]" />
+                        </Card>
+                    </div>
+                    <div className="lg:col-span-9 space-y-8">
+                        <Card>
+                            <CardHeader>
+                                <Skeleton className="h-5 w-48" />
+                            </CardHeader>
+                            <CardContent className="pt-2">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-6">
+                                    {[...Array(8)].map((_, i) => (
+                                        <div key={i} className="space-y-2">
+                                            <Skeleton className="h-3 w-24" />
+                                            <Skeleton className="h-4 w-32" />
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    if (!release) return <div className="text-center p-20 text-red-500 font-black uppercase tracking-widest animate-fade-in">Session not found in distribution archive.</div>;
+
+    const commonProps = {
+        release, artist, label, allArtists, isStaff, onBack: () => navigate('/releases'),
+        onPlayTrack: (src, title) => setPlayingTrack({ src, title }),
+        playingTrack,
+        setPlayingTrack
+    };
+
+    // Use phpMyAdmin style for admin/employee users
+    if (isPlatformSide) {
+        return <PmaReleaseDetailView {...commonProps} />;
+    }
+
+    // Use dark theme for partner users
+    return <PartnerReleaseDetailView {...commonProps} />;
 };
 
 export default ReleaseDetail;

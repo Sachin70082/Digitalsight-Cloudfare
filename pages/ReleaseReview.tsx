@@ -7,6 +7,7 @@ import { Release, ReleaseStatus, Track, UserRole, Artist, Label, InteractionNote
 import { AppContext } from '../App';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, PageLoader, Textarea, Modal, Spinner, Input } from '../components/ui';
 import { DownloadIcon, CheckCircleIcon, XCircleIcon, ArrowLeftIcon, MusicIcon, SpotifyIcon, AppleMusicIcon, InstagramIcon } from '../components/Icons';
+import { PmaFieldset, PmaTable, PmaTR, PmaTD, PmaButton, PmaInput, PmaStatusBadge, PmaInfoBar, PmaSectionTitle, PmaActionLink, PmaAudioPlayer } from '../components/PmaStyle';
 
 const MetaItem: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) => (
     <div>
@@ -51,9 +52,43 @@ const InteractionLog: React.FC<{ notes: InteractionNote[] }> = ({ notes }) => {
 };
 
 const PackageCircularProgress: React.FC<{ percentage: number, status: string }> = ({ percentage, status }) => {
+    const { user } = useContext(AppContext);
+    const isPlatformSide = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
     const radius = 85;
     const circumference = 2 * Math.PI * radius;
     const strokeDashoffset = circumference - (percentage / 100) * circumference;
+
+    if (isPlatformSide) {
+        return (
+            <div className="fixed inset-0 z-[2000] bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center p-12 text-center animate-fade-in">
+                <div className="w-full max-w-md space-y-8">
+                    <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
+                        <svg className="w-full h-full transform -rotate-90 relative z-10">
+                            <circle cx="96" cy="96" r="80" stroke="#eee" strokeWidth="10" fill="transparent" />
+                            <circle
+                                cx="96"
+                                cy="96"
+                                r="80"
+                                stroke="#0066cc"
+                                strokeWidth="10"
+                                fill="transparent"
+                                strokeDasharray={2 * Math.PI * 80}
+                                style={{ strokeDashoffset: (2 * Math.PI * 80) - (percentage / 100) * (2 * Math.PI * 80), transition: 'stroke-dashoffset 0.5s' }}
+                                strokeLinecap="round"
+                            />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
+                            <span className="text-4xl font-bold text-[#333]">{Math.round(percentage)}%</span>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <h3 className="text-xl font-bold text-[#333]">Vault Transmission</h3>
+                        <p className="text-sm text-[#666] font-mono bg-[#f5f5f5] border border-[#ccc] px-4 py-2 rounded">{status}</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 z-[2000] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-12 text-center animate-fade-in">
@@ -96,6 +131,243 @@ const PackageCircularProgress: React.FC<{ percentage: number, status: string }> 
     );
 };
 
+// phpMyAdmin style Release Review for admin users
+const PmaReleaseReviewView: React.FC<{
+    release: Release;
+    artistsMap: Map<string, Artist>;
+    label: Label | null;
+    isPublished: boolean;
+    isProcessing: boolean;
+    handleDownloadPackage: () => void;
+    setReturnModalOpen: (o: boolean) => void;
+    setApproveConfirmOpen: (o: boolean) => void;
+    setTakedownConfirmOpen: (o: boolean) => void;
+    setRejectModalOpen: (o: boolean) => void;
+    setFeedbackNote: (n: string) => void;
+    setCurrentStep: (s: number) => void;
+    onBack: () => void;
+    onPlayTrack: (src: string, title: string) => void;
+    playingTrack: { src: string, title: string } | null;
+    setPlayingTrack: (t: { src: string, title: string } | null) => void;
+}> = ({ 
+    release, artistsMap, label, isPublished, isProcessing, 
+    handleDownloadPackage, setReturnModalOpen, setApproveConfirmOpen, 
+    setTakedownConfirmOpen, setRejectModalOpen, setFeedbackNote, 
+    setCurrentStep, onBack, onPlayTrack, playingTrack, setPlayingTrack
+}) => {
+    return (
+        <div className="space-y-4 pb-20">
+            <PmaInfoBar>
+                <strong>Table:</strong> releases &nbsp;|&nbsp; 
+                <strong>Row:</strong> {release.id} &nbsp;|&nbsp;
+                <strong>Status:</strong> <PmaStatusBadge status={release.status} />
+            </PmaInfoBar>
+
+            <div className="flex items-center gap-4 mb-4">
+                <button onClick={onBack} className="text-[#0066cc] hover:underline text-sm flex items-center gap-1">
+                    ← Back to list
+                </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Left Column */}
+                <div className="space-y-4">
+                    <PmaFieldset legend="Cover Art">
+                        <div className="p-2">
+                            <img src={release.artworkUrl} alt="Artwork" className="w-full h-auto border border-[#ccc]" />
+                        </div>
+                    </PmaFieldset>
+
+                    <PmaFieldset legend="Audit History">
+                        <div className="p-2 max-h-64 overflow-y-auto text-xs">
+                            {(!release.notes || release.notes.length === 0) ? (
+                                <p className="text-[#999] text-center py-4">No history.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {[...release.notes].sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || '')).map((note) => (
+                                        <div key={note.id} className="border-b border-[#eee] pb-2">
+                                            <div className="flex justify-between font-bold text-black mb-1">
+                                                <span>{note.authorName}</span>
+                                                <span className="font-mono">{new Date(note.timestamp).toLocaleDateString()}</span>
+                                            </div>
+                                            <p className="text-black">{note.message}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </PmaFieldset>
+
+                    <PmaFieldset legend="Operations">
+                        <div className="p-4 space-y-3">
+                            <PmaButton variant="primary" className="w-full" onClick={handleDownloadPackage} disabled={isProcessing}>
+                                Download Metadata (XLSX)
+                            </PmaButton>
+                            
+                            {!isPublished ? (
+                                <>
+                                    <PmaButton variant="primary" className="w-full bg-gradient-to-b from-[#009900] to-[#006600] border-[#006600]" onClick={() => { setCurrentStep(1); setApproveConfirmOpen(true); }} disabled={isProcessing}>
+                                        Finalize & Publish
+                                    </PmaButton>
+                                    <PmaButton variant="secondary" className="w-full" onClick={() => setReturnModalOpen(true)} disabled={isProcessing}>
+                                        Return for Corrections
+                                    </PmaButton>
+                                    <PmaButton variant="danger" className="w-full" onClick={() => { setFeedbackNote(''); setRejectModalOpen(true); }} disabled={isProcessing}>
+                                        Reject Content
+                                    </PmaButton>
+                                </>
+                            ) : (
+                                <PmaButton variant="danger" className="w-full" onClick={() => setTakedownConfirmOpen(true)} disabled={isProcessing}>
+                                    Execute Takedown
+                                </PmaButton>
+                            )}
+                        </div>
+                    </PmaFieldset>
+                </div>
+
+                {/* Right Column */}
+                <div className="lg:col-span-2 space-y-4">
+                    <PmaFieldset legend="Release Metadata">
+                        <div className="p-4">
+                            <PmaTable headers={[{ label: 'Field' }, { label: 'Value' }]}>
+                                <PmaTR>
+                                    <PmaTD isLabel>Title</PmaTD>
+                                    <PmaTD className="text-black">{release.title}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Artists</PmaTD>
+                                    <PmaTD className="text-black">{(release.primaryArtistIds || []).map(id => artistsMap.get(id)?.name).filter(Boolean).join(', ') || 'Unknown'}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Label</PmaTD>
+                                    <PmaTD className="text-black">{label?.name || 'Unknown'}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>UPC</PmaTD>
+                                    <PmaTD className="font-mono text-black">{release.upc || 'Pending'}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Catalogue #</PmaTD>
+                                    <PmaTD className="text-black">{release.catalogueNumber}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Genre / Mood</PmaTD>
+                                    <PmaTD className="text-black">{release.genre} / {release.mood}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Release Date</PmaTD>
+                                    <PmaTD className="text-black">{release.releaseDate}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>P-Line / C-Line</PmaTD>
+                                    <PmaTD className="text-black">{release.pLine} / {release.cLine}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Language</PmaTD>
+                                    <PmaTD className="text-black">{release.language || '-'}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Publisher</PmaTD>
+                                    <PmaTD className="text-black">{release.publisher || '-'}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>Explicit</PmaTD>
+                                    <PmaTD className="text-black">{release.explicit ? 'Yes' : 'No'}</PmaTD>
+                                </PmaTR>
+                                <PmaTR>
+                                    <PmaTD isLabel>YouTube Content ID</PmaTD>
+                                    <PmaTD className="text-black">{release.youtubeContentId ? 'Enabled' : 'Disabled'}</PmaTD>
+                                </PmaTR>
+                            </PmaTable>
+                        </div>
+                    </PmaFieldset>
+
+                    {(release.filmName || release.filmDirector) && (
+                        <PmaFieldset legend="Film Sync Data">
+                            <div className="p-4">
+                                <PmaTable headers={[{ label: 'Field' }, { label: 'Value' }]}>
+                                    <PmaTR>
+                                        <PmaTD isLabel>Film Name</PmaTD>
+                                        <PmaTD className="text-black">{release.filmName}</PmaTD>
+                                    </PmaTR>
+                                    <PmaTR>
+                                        <PmaTD isLabel>Director</PmaTD>
+                                        <PmaTD className="text-black">{release.filmDirector}</PmaTD>
+                                    </PmaTR>
+                                    <PmaTR>
+                                        <PmaTD isLabel>Producer</PmaTD>
+                                        <PmaTD className="text-black">{release.filmProducer}</PmaTD>
+                                    </PmaTR>
+                                    <PmaTR>
+                                        <PmaTD isLabel>Banner</PmaTD>
+                                        <PmaTD className="text-black">{release.filmBanner}</PmaTD>
+                                    </PmaTR>
+                                    <PmaTR>
+                                        <PmaTD isLabel>Cast</PmaTD>
+                                        <PmaTD className="text-black">{release.filmCast}</PmaTD>
+                                    </PmaTR>
+                                </PmaTable>
+                            </div>
+                        </PmaFieldset>
+                    )}
+
+                    <PmaFieldset legend="Tracklist">
+                        <div className="p-4">
+                            <PmaTable headers={[
+                                { label: '#' },
+                                { label: 'Title / Version' },
+                                { label: 'ISRC' },
+                                { label: 'Duration' },
+                                { label: 'Composer / Lyricist' },
+                                { label: 'Explicit', className: 'text-center' },
+                                { label: 'Audio', className: 'text-center' }
+                            ]}>
+                                {(release.tracks || []).map(track => (
+                                    <PmaTR key={track.id}>
+                                        <PmaTD className="text-center text-black">{track.trackNumber}</PmaTD>
+                                        <PmaTD isLabel className="text-black">
+                                            <div>{track.title}</div>
+                                            <div className="text-[9px] text-[#666]">{track.versionTitle || '-'}</div>
+                                        </PmaTD>
+                                        <PmaTD className="font-mono text-xs text-black">{track.isrc}</PmaTD>
+                                        <PmaTD className="text-right font-mono text-xs text-black">
+                                            {Math.floor(track.duration/60)}:{String(track.duration%60).padStart(2,'0')}
+                                        </PmaTD>
+                                        <PmaTD className="text-black">
+                                            <div className="text-[10px]">{track.composer || '-'}</div>
+                                            <div className="text-[9px] text-[#666]">{track.lyricist || '-'}</div>
+                                        </PmaTD>
+                                        <PmaTD className="text-center text-black">
+                                            {track.explicit ? <span className="text-[#cc0000] font-bold">Yes</span> : 'No'}
+                                        </PmaTD>
+                                        <PmaTD className="text-center">
+                                            <PmaButton 
+                                                variant={playingTrack?.src === track.audioUrl ? 'primary' : 'secondary'}
+                                                onClick={() => onPlayTrack(track.audioUrl, track.title)}
+                                                className="px-2 py-0.5 text-[10px]"
+                                            >
+                                                {playingTrack?.src === track.audioUrl ? 'Playing...' : 'Play'}
+                                            </PmaButton>
+                                        </PmaTD>
+                                    </PmaTR>
+                                ))}
+                            </PmaTable>
+                        </div>
+                    </PmaFieldset>
+                </div>
+            </div>
+
+            {playingTrack && (
+                <PmaAudioPlayer 
+                    src={playingTrack.src} 
+                    title={playingTrack.title} 
+                    onClose={() => setPlayingTrack(null)} 
+                />
+            )}
+        </div>
+    );
+};
+
 const ReleaseReview: React.FC = () => {
     const { releaseId } = useParams<{ releaseId: string }>();
     const navigate = useNavigate();
@@ -124,6 +396,8 @@ const ReleaseReview: React.FC = () => {
     const [upcInput, setUpcInput] = useState('');
     const [tracksInput, setTracksInput] = useState<Track[]>([]);
     const [currentStep, setCurrentStep] = useState(1);
+
+    const [playingTrack, setPlayingTrack] = useState<{ src: string, title: string } | null>(null);
 
     useEffect(() => {
         const isStaff = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
@@ -315,6 +589,137 @@ const ReleaseReview: React.FC = () => {
     if (!release) return <div className="text-center p-10 text-red-500">Node identity not found.</div>;
 
     const isPublished = release.status === ReleaseStatus.PUBLISHED;
+    const isPlatformSide = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
+
+    if (isPlatformSide) {
+        return (
+            <>
+                {isDownloadingPackage && (
+                    <PackageCircularProgress percentage={packagePercentage} status={packageStatus} />
+                )}
+                <PmaReleaseReviewView
+                    release={release}
+                    artistsMap={artistsMap}
+                    label={label}
+                    isPublished={isPublished}
+                    isProcessing={isProcessing}
+                    handleDownloadPackage={handleDownloadPackage}
+                    setReturnModalOpen={setReturnModalOpen}
+                    setApproveConfirmOpen={setApproveConfirmOpen}
+                    setTakedownConfirmOpen={setTakedownConfirmOpen}
+                    setRejectModalOpen={setRejectModalOpen}
+                    setFeedbackNote={setFeedbackNote}
+                    setCurrentStep={setCurrentStep}
+                    onBack={() => navigate('/releases')}
+                    onPlayTrack={(src, title) => setPlayingTrack({ src, title })}
+                    playingTrack={playingTrack}
+                    setPlayingTrack={setPlayingTrack}
+                />
+
+                <Modal isOpen={isReturnModalOpen} onClose={() => setReturnModalOpen(false)} title="Correction Directive" size="lg">
+                    <div className="space-y-4 p-4">
+                        <div className="p-4 bg-[#ffffcc] border border-[#cc9] rounded text-sm text-[#666]">
+                            Specify exactly which metadata fields or binary assets require correction.
+                        </div>
+                        <textarea 
+                            className="w-full border-2 border-[#ccc] p-3 text-sm min-h-[120px] focus:border-[#0066cc] outline-none text-black"
+                            placeholder="e.g. Artwork is not 3000x3000px. Track 2 ISRC is invalid."
+                            value={feedbackNote}
+                            onChange={(e) => setFeedbackNote(e.target.value)}
+                        />
+                        <div className="flex gap-2">
+                            <PmaButton variant="secondary" onClick={() => setReturnModalOpen(false)}>Cancel</PmaButton>
+                            <PmaButton variant="primary" onClick={() => handleStatusChange(ReleaseStatus.NEEDS_INFO, feedbackNote)} disabled={!feedbackNote.trim() || isProcessing}>
+                                Dispatch Fix Request
+                            </PmaButton>
+                        </div>
+                    </div>
+                </Modal>
+
+                <Modal isOpen={isApproveConfirmOpen} onClose={() => setApproveConfirmOpen(false)} title={currentStep === 1 ? "Finalize: UPC Assignment" : "Finalize: ISRC Verification"} size="lg">
+                    <div className="p-4 space-y-4">
+                        {currentStep === 1 ? (
+                            <>
+                                <div className="p-4 bg-[#e8f4e8] border border-[#009900] text-sm text-[#006600]">
+                                    Step 1/2: Assign or verify the Universal Product Code (UPC).
+                                </div>
+                                <PmaInput label="UPC Code" value={upcInput} onChange={setUpcInput} placeholder="Enter 12 or 13 digit UPC" />
+                                <div className="flex justify-end gap-2">
+                                    <PmaButton variant="secondary" onClick={() => setApproveConfirmOpen(false)}>Cancel</PmaButton>
+                                    <PmaButton variant="primary" onClick={() => setCurrentStep(2)} disabled={!upcInput.trim()}>Next Step</PmaButton>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="p-4 bg-[#e8f4e8] border border-[#009900] text-sm text-[#006600]">
+                                    Step 2/2: Verify ISRC codes for all tracks.
+                                </div>
+                                <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                                    {tracksInput.map((track) => (
+                                        <div key={track.id} className="flex items-center gap-3 p-2 border border-[#ccc]">
+                                            <span className="w-6 text-xs font-bold">{track.trackNumber}</span>
+                                            <span className="flex-1 text-xs truncate">{track.title}</span>
+                                            <input 
+                                                className="w-40 border border-[#ccc] px-2 py-1 text-xs font-mono"
+                                                value={track.isrc || ''}
+                                                onChange={(e) => handleTrackIsrcChange(track.id, e.target.value)}
+                                                placeholder="ISRC"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex justify-between gap-2">
+                                    <PmaButton variant="secondary" onClick={() => setCurrentStep(1)}>Back</PmaButton>
+                                    <PmaButton variant="primary" onClick={handleFinalizePublish} disabled={isProcessing}>Finalize & Publish</PmaButton>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </Modal>
+
+                <Modal isOpen={isRejectModalOpen} onClose={() => setRejectModalOpen(false)} title="Rejection Protocol" size="lg">
+                    <div className="p-4 space-y-4">
+                        <div className="p-4 bg-[#ffcccc] border border-[#cc0000] text-sm text-[#cc0000]">
+                            <strong>Warning:</strong> Rejection will purge audio masters. Metadata remains for audit.
+                        </div>
+                        <textarea 
+                            className="w-full border-2 border-[#ccc] p-3 text-sm min-h-[100px] focus:border-[#cc0000] outline-none"
+                            placeholder="Specify compliance failure..."
+                            value={feedbackNote}
+                            onChange={(e) => setFeedbackNote(e.target.value)}
+                        />
+                        <div className="flex gap-2">
+                            <PmaButton variant="secondary" onClick={() => setRejectModalOpen(false)}>Cancel</PmaButton>
+                            <PmaButton variant="danger" onClick={() => handleStatusChange(ReleaseStatus.REJECTED, `Rejection: ${feedbackNote}`)} disabled={!feedbackNote.trim() || isProcessing}>
+                                Confirm Rejection
+                            </PmaButton>
+                        </div>
+                    </div>
+                </Modal>
+
+                <Modal isOpen={isTakedownConfirmOpen} onClose={() => setTakedownConfirmOpen(false)} title="Execute Takedown" size="lg">
+                    <div className="p-4 space-y-4">
+                        <div className="p-4 bg-[#ffe6cc] border border-[#cc6600] text-sm text-[#cc6600]">
+                            <strong>Irreversible:</strong> Takedown protocol will remove content from all endpoints.
+                        </div>
+                        <textarea 
+                            className="w-full border-2 border-[#ccc] p-3 text-sm min-h-[100px] focus:border-[#cc6600] outline-none"
+                            placeholder="State reason for takedown..."
+                            value={feedbackNote}
+                            onChange={(e) => setFeedbackNote(e.target.value)}
+                        />
+                        <div className="flex gap-2">
+                            <PmaButton variant="secondary" onClick={() => setTakedownConfirmOpen(false)}>Abort</PmaButton>
+                            <PmaButton variant="danger" className="bg-[#cc6600] border-[#cc6600]" onClick={() => handleStatusChange(ReleaseStatus.TAKEDOWN, `Takedown: ${feedbackNote}`)} disabled={!feedbackNote.trim() || isProcessing}>
+                                Confirm Takedown
+                            </PmaButton>
+                        </div>
+                    </div>
+                </Modal>
+            </>
+        );
+    }
+
     const primaryArtist = release.primaryArtistIds?.[0] ? (artistsMap.get(release.primaryArtistIds[0])?.name || 'Unknown Artist') : 'Unknown Artist';
 
     return (
@@ -568,6 +973,7 @@ const ReleaseReview: React.FC = () => {
                     <div className=" space-y-3">
                         <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">Directive Details</label>
                         <Textarea 
+                            className="text-black"
                             placeholder="e.g. Artwork is not 3000x3000px. Track 2 ISRC is invalid. Please update and resubmit."
                             value={feedbackNote}
                             onChange={(e) => setFeedbackNote(e.target.value)}

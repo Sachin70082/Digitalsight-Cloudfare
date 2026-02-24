@@ -4,6 +4,7 @@ import { AppContext } from '../App';
 import { Release, Track, ReleaseType, Artist, ReleaseStatus, Label, UserRole } from '../types';
 import { Button, Input, Textarea, Spinner } from './ui';
 import { SparklesIcon, UploadIcon, XCircleIcon, MusicIcon, CheckCircleIcon } from './Icons';
+import { PmaFieldset, PmaTable, PmaTR, PmaTD, PmaButton, PmaInput, PmaSelect, PmaStatusBadge, PmaInfoBar } from './PmaStyle';
 import { api } from '../services/mockApi';
 import { r2Service } from '../services/r2Service';
 import ArtistSelector from './ArtistSelector';
@@ -129,27 +130,60 @@ const ReleaseForm: React.FC<ReleaseFormProps> = ({ onClose, onSave, initialRelea
 
     useEffect(() => {
         const loadInitialData = async () => {
-            if (user?.labelId) {
-                const [artists, subLabels] = await Promise.all([
-                    api.getArtistsByLabel(user.labelId),
-                    api.getSubLabels(user.labelId)
-                ]);
-                setLabelArtists(artists);
-                const selfLabel = await api.getLabel(user.labelId);
-                const combinedLabels = selfLabel ? [selfLabel, ...subLabels] : subLabels;
-                setHierarchyLabels(combinedLabels);
+            const isPlatformSide = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
+            const targetLabelId = formData.labelId || user?.labelId;
+
+            // --- Fetch Artists (independent, always attempted) ---
+            try {
+                if (isPlatformSide) {
+                    const artists = targetLabelId
+                        ? await api.getArtistsByLabel(targetLabelId)
+                        : await api.getAllArtists();
+                    setLabelArtists(Array.isArray(artists) ? artists : []);
+                } else if (targetLabelId) {
+                    const artists = await api.getArtistsByLabel(targetLabelId);
+                    setLabelArtists(Array.isArray(artists) ? artists : []);
+                }
+            } catch (err) {
+                console.error('Failed to fetch artists:', err);
+                setLabelArtists([]);
             }
 
+            // --- Fetch Label Hierarchy (separate, failure won't block artists) ---
+            try {
+                if (isPlatformSide) {
+                    if (hierarchyLabels.length === 0) {
+                        const allLabels = await api.getLabels();
+                        setHierarchyLabels(Array.isArray(allLabels) ? allLabels : []);
+                    }
+                } else if (targetLabelId && user?.labelId && hierarchyLabels.length === 0) {
+                    const [selfLabel, subLabels] = await Promise.all([
+                        api.getLabel(user.labelId).catch(() => null),
+                        api.getSubLabels(targetLabelId).catch(() => [])
+                    ]);
+                    const safeSubLabels = Array.isArray(subLabels) ? subLabels : [];
+                    const combinedLabels = selfLabel ? [selfLabel, ...safeSubLabels] : safeSubLabels;
+                    setHierarchyLabels(combinedLabels);
+                }
+            } catch (err) {
+                console.error('Failed to fetch label hierarchy:', err);
+            }
+
+            // --- Load existing release for editing ---
             if (initialReleaseId) {
-                const existing = await api.getRelease(initialReleaseId);
-                if (existing) {
-                    setFormData({ 
-                        ...existing,
-                        tracks: existing.tracks || [emptyTrack(1)],
-                        notes: existing.notes || [],
-                        primaryArtistIds: existing.primaryArtistIds || [],
-                        featuredArtistIds: existing.featuredArtistIds || []
-                    });
+                try {
+                    const existing = await api.getRelease(initialReleaseId);
+                    if (existing) {
+                        setFormData({
+                            ...existing,
+                            tracks: existing.tracks || [emptyTrack(1)],
+                            notes: existing.notes || [],
+                            primaryArtistIds: existing.primaryArtistIds || [],
+                            featuredArtistIds: existing.featuredArtistIds || []
+                        });
+                    }
+                } catch (err) {
+                    console.error('Failed to load release:', err);
                 }
                 setIsLoading(false);
             } else {
@@ -157,7 +191,7 @@ const ReleaseForm: React.FC<ReleaseFormProps> = ({ onClose, onSave, initialRelea
             }
         };
         loadInitialData();
-    }, [initialReleaseId, user]);
+    }, [initialReleaseId, user, formData.labelId]);
 
     const handleChange = <T extends keyof FormData,>(field: T, value: FormData[T]) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -303,6 +337,7 @@ const ReleaseForm: React.FC<ReleaseFormProps> = ({ onClose, onSave, initialRelea
     if (isLoading) return <div className="py-10 flex justify-center"><Spinner /></div>;
 
     const canSubmit = user?.permissions?.canSubmitAlbums || user?.role === 'Owner' || user?.role === 'Employee';
+    const isPlatformSide = user?.role === UserRole.OWNER || user?.role === UserRole.EMPLOYEE;
     const showLabelSelector = hierarchyLabels.length > 1;
     
     const latestAdminNote = formData.notes
@@ -310,6 +345,247 @@ const ReleaseForm: React.FC<ReleaseFormProps> = ({ onClose, onSave, initialRelea
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
             .find(n => n.authorRole === UserRole.OWNER || n.authorRole === UserRole.EMPLOYEE)
         : null;
+
+    if (isPlatformSide) {
+        return (
+            <div className="space-y-4 relative">
+                {isSubmitting && (
+                    <div className="absolute inset-0 z-[100] bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center animate-fade-in rounded-2xl">
+                        <div className="w-full max-w-xs space-y-4">
+                            <Spinner className="w-12 h-12 border-[#0066cc] border-t-transparent mx-auto" />
+                            <h3 className="text-lg font-bold text-[#333]">Processing...</h3>
+                            <p className="text-xs text-[#666]">{progressStatus}</p>
+                            <div className="relative h-2 w-full bg-[#eee] rounded-full overflow-hidden border border-[#ccc]">
+                                <div className="absolute top-0 left-0 h-full bg-[#0066cc] transition-all duration-700" style={{ width: `${uploadProgress}%` }} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step Tabs */}
+                <div className="flex border-b border-[#ccc] mb-4 overflow-x-auto">
+                    {['General', 'Commercial', 'Genre', 'Film', 'Tracks', 'Artwork', 'Review'].map((name, index) => (
+                        <button
+                            key={name}
+                            onClick={() => !isSubmitting && setStep(index + 1)}
+                            className={`px-4 py-2 text-xs font-bold border-t-2 border-x-2 -mb-[2px] rounded-t transition-colors ${
+                                step === index + 1 
+                                    ? 'bg-white border-[#ccc] border-b-white text-black' 
+                                    : 'bg-[#f5f5f5] border-transparent text-black hover:bg-[#eee]'
+                            }`}
+                        >
+                            {index + 1}. {name}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="min-h-[400px]">
+                    {step === 1 && (
+                        <PmaFieldset legend="General Information">
+                            <div className="p-4 space-y-4">
+                                {showLabelSelector && (
+                                    <PmaSelect
+                                        label="Target Label"
+                                        value={formData.labelId}
+                                        onChange={val => handleChange('labelId', val)}
+                                        options={hierarchyLabels.map(l => ({ value: l.id, label: l.name }))}
+                                    />
+                                )}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <PmaInput label="Release Title" value={formData.title} onChange={val => handleChange('title', val)} placeholder="e.g. Neon Nights" />
+                                    <PmaSelect
+                                        label="Release Type"
+                                        value={formData.releaseType}
+                                        onChange={val => handleChange('releaseType', val as ReleaseType)}
+                                        options={Object.values(ReleaseType).map(t => ({ value: t, label: t }))}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <ArtistSelector label="Primary Artist(s)" allArtists={labelArtists} selectedArtistIds={formData.primaryArtistIds || []} onChange={(ids) => handleChange('primaryArtistIds', ids)} />
+                                    <ArtistSelector label="Featured Artist(s)" allArtists={labelArtists} selectedArtistIds={formData.featuredArtistIds || []} onChange={(ids) => handleChange('featuredArtistIds', ids)} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-black mb-1">Description</label>
+                                    <textarea
+                                        value={formData.description}
+                                        onChange={e => handleChange('description', e.target.value)}
+                                        className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none min-h-[100px] text-black"
+                                    />
+                                </div>
+                            </div>
+                        </PmaFieldset>
+                    )}
+
+                    {step === 2 && (
+                        <PmaFieldset legend="Commercial Metadata">
+                            <div className="p-4 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <PmaInput label="UPC Code" value={formData.upc} onChange={val => handleChange('upc', val)} placeholder="Auto-generate if blank" />
+                                    <PmaInput label="Catalogue #" value={formData.catalogueNumber} onChange={val => handleChange('catalogueNumber', val)} placeholder="e.g. LAB-001" />
+                                </div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <PmaInput label="Release Date" type="date" value={formData.releaseDate} onChange={val => handleChange('releaseDate', val)} />
+                                    <PmaInput label="P-Line" value={formData.pLine} onChange={val => handleChange('pLine', val)} placeholder="e.g. 2024 DigitalSight" />
+                                    <PmaInput label="C-Line" value={formData.cLine} onChange={val => handleChange('cLine', val)} placeholder="e.g. 2024 DigitalSight" />
+                                </div>
+                                <PmaInput label="Publisher" value={formData.publisher} onChange={val => handleChange('publisher', val)} placeholder="Company Name" />
+                            </div>
+                        </PmaFieldset>
+                    )}
+
+                    {step === 3 && (
+                        <PmaFieldset legend="Genre & Mood">
+                            <div className="p-4 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <PmaSelect
+                                        label="Primary Genre"
+                                        value={formData.genre}
+                                        onChange={val => handleChange('genre', val)}
+                                        options={GENRES.map(g => ({ value: g, label: g }))}
+                                    />
+                                    <PmaInput label="Sub-Genre" value={formData.subGenre} onChange={val => handleChange('subGenre', val)} placeholder="e.g. Trap" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <PmaSelect
+                                        label="Core Mood"
+                                        value={formData.mood}
+                                        onChange={val => handleChange('mood', val)}
+                                        options={MOODS.map(m => ({ value: m, label: m }))}
+                                    />
+                                    <PmaSelect
+                                        label="Language"
+                                        value={formData.language}
+                                        onChange={val => handleChange('language', val)}
+                                        options={LANGUAGES.map(l => ({ value: l, label: l }))}
+                                    />
+                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={formData.explicit} onChange={e => handleChange('explicit', e.target.checked)} />
+                                    <span className="text-sm font-bold text-[#333]">Explicit Content</span>
+                                </label>
+                            </div>
+                        </PmaFieldset>
+                    )}
+
+                    {step === 4 && (
+                        <PmaFieldset legend="Film Sync Data">
+                            <div className="p-4 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <PmaInput label="Production Title" value={formData.filmName} onChange={val => handleChange('filmName', val)} placeholder="Film or Series" />
+                                    <PmaInput label="Director" value={formData.filmDirector} onChange={val => handleChange('filmDirector', val)} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <PmaInput label="Producer" value={formData.filmProducer} onChange={val => handleChange('filmProducer', val)} />
+                                    <PmaInput label="Studio" value={formData.filmBanner} onChange={val => handleChange('filmBanner', val)} />
+                                </div>
+                                <PmaInput label="Star Cast" value={formData.filmCast} onChange={val => handleChange('filmCast', val)} placeholder="Separate with commas" />
+                            </div>
+                        </PmaFieldset>
+                    )}
+
+                    {step === 5 && (
+                        <PmaFieldset legend="Tracklist">
+                            <div className="p-4 space-y-4">
+                                <div className="flex justify-end">
+                                    <PmaButton onClick={addTrack}>+ Add Track</PmaButton>
+                                </div>
+                                <div className="space-y-4">
+                                    {(formData.tracks || []).map((track, index) => (
+                                        <div key={track.id} className="border border-[#ccc] p-4 bg-[#f9f9f9] space-y-4">
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-bold text-[#333]">Track #{track.trackNumber}</span>
+                                                {formData.tracks && formData.tracks.length > 1 && (
+                                                    <PmaButton variant="danger" className="px-2 py-1 text-xs" onClick={() => removeTrack(index)}>Remove</PmaButton>
+                                                )}
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <PmaInput label="Track Title" value={track.title} onChange={val => handleTrackChange(index, 'title', val)} />
+                                                <PmaInput label="Version" value={track.versionTitle} onChange={val => handleTrackChange(index, 'versionTitle', val)} placeholder="Radio Edit" />
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-4">
+                                                <PmaInput label="ISRC" value={track.isrc} onChange={val => handleTrackChange(index, 'isrc', val)} placeholder="Auto-generate" />
+                                                <PmaInput label="Composer" value={track.composer} onChange={val => handleTrackChange(index, 'composer', val)} />
+                                                <PmaInput label="Lyricist" value={track.lyricist} onChange={val => handleTrackChange(index, 'lyricist', val)} />
+                                            </div>
+                                            <div className="border-2 border-dashed border-[#ccc] p-4 bg-white text-center relative">
+                                                {track.audioUrl ? (
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs font-mono">{track.audioFileName}</span>
+                                                        <PmaButton variant="secondary" className="text-xs" onClick={() => handleTrackChange(index, 'audioUrl', '')}>Replace</PmaButton>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <span className="text-xs text-[#666]">Select WAV Master</span>
+                                                        <input type="file" accept=".wav" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const f = e.target.files?.[0]; if(f) handleAudioSelect(f, index); }} />
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </PmaFieldset>
+                    )}
+
+                    {step === 6 && (
+                        <PmaFieldset legend="Artwork">
+                            <div className="p-4 flex flex-col items-center space-y-4">
+                                <div className="w-64 h-64 border-2 border-dashed border-[#ccc] bg-[#f5f5f5] flex items-center justify-center relative overflow-hidden">
+                                    {formData.artworkUrl ? (
+                                        <img src={stagedArtwork ? URL.createObjectURL(stagedArtwork) : formData.artworkUrl} className="w-full h-full object-cover" alt="Cover" />
+                                    ) : (
+                                        <span className="text-xs text-[#666]">Select 3000x3000px Art</span>
+                                    )}
+                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if(f) handleArtworkSelect(f); }} />
+                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={formData.youtubeContentId} onChange={e => handleChange('youtubeContentId', e.target.checked)} />
+                                    <span className="text-sm font-bold text-[#333]">YouTube Content ID</span>
+                                </label>
+                            </div>
+                        </PmaFieldset>
+                    )}
+
+                    {step === 7 && (
+                        <PmaFieldset legend="Review & Submit">
+                            <div className="p-4 space-y-4">
+                                <div className="flex gap-4 items-center border-b border-[#ccc] pb-4">
+                                    <img src={stagedArtwork ? URL.createObjectURL(stagedArtwork) : formData.artworkUrl} className="w-24 h-24 border border-[#ccc]" alt="" />
+                                    <div>
+                                        <h3 className="font-bold text-lg text-black">{formData.title || 'Untitled'}</h3>
+                                        <p className="text-sm text-black">{(formData.tracks || []).length} Tracks</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-black mb-1">Submission Note</label>
+                                    <textarea
+                                        value={submissionNote}
+                                        onChange={e => setSubmissionNote(e.target.value)}
+                                        className="w-full border-2 border-[#ccc] px-3 py-2 text-sm focus:border-[#0066cc] outline-none min-h-[80px] text-black"
+                                        placeholder="Technical context..."
+                                    />
+                                </div>
+                            </div>
+                        </PmaFieldset>
+                    )}
+                </div>
+
+                <div className="flex justify-between items-center pt-4 border-t border-[#ccc]">
+                    <PmaButton variant="secondary" onClick={() => setStep(s => Math.max(1, s - 1))} disabled={step === 1 || isSubmitting}>Previous</PmaButton>
+                    {step < 7 ? (
+                        <PmaButton variant="primary" onClick={() => setStep(s => s + 1)} disabled={isSubmitting}>Next</PmaButton>
+                    ) : (
+                        <div className="flex gap-2">
+                            <PmaButton variant="secondary" onClick={() => handleAction(false)} disabled={isSubmitting}>Save Draft</PmaButton>
+                            <PmaButton variant="primary" onClick={() => handleAction(true)} disabled={isSubmitting || !canSubmit}>
+                                {isSubmitting ? 'Processing...' : 'Execute Ingest'}
+                            </PmaButton>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 relative">

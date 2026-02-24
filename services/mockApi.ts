@@ -133,7 +133,7 @@ class ApiService {
   async getAllArtists(): Promise<Artist[]> { return this.request('/artists'); }
   async getArtist(id: string): Promise<Artist> { return this.request(`/artists/${id}`); }
   async getArtistsByLabel(labelId: string): Promise<Artist[]> {
-      return this.getAllArtists();
+      return this.request(`/artists?labelId=${labelId}`);
   }
   async addArtist(artist: Partial<Artist>): Promise<Artist> {
       return this.request('/artists', { method: 'POST', body: JSON.stringify(artist) });
@@ -147,6 +147,14 @@ class ApiService {
 
   // Releases
   async getAllReleases(): Promise<Release[]> { return this.request('/releases'); }
+  async exportReleases(startDate?: string, endDate?: string, status?: string): Promise<Release[]> {
+      const params = new URLSearchParams();
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+      if (status && status !== 'ALL') params.set('status', status);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return this.request(`/releases/export${query}`);
+  }
   async getRelease(id: string): Promise<Release> { return this.request(`/releases/${id}`); }
   async getReleasesByLabel(labelId: string): Promise<Release[]> {
       return this.getAllReleases();
