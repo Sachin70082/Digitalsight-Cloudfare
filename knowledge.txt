@@ -1,0 +1,94 @@
+DIGITALSIGHT CLIENT DASHBOARD KNOWLEDGE BASE
+==========================================
+
+Welcome to the DigitalSight Distribution Platform. This guide provides a comprehensive overview of the dashboard functions, release creation process, and system statuses.
+
+1. DASHBOARD OVERVIEW
+---------------------
+The Dashboard is your central command center. It provides:
+- Release Statistics: Real-time count of your releases by status (Draft, Published, Pending, etc.).
+- Entity Statistics: Number of Artists and Labels under your account.
+- Corporate Board Notices: Important system updates, policy changes, and announcements.
+- Quick Actions: Fast access to "My Catalog" and "Manage Artists".
+
+2. CORE PAGES & FUNCTIONS
+-------------------------
+- Dashboard: Overview of your account activity and statistics.
+- My Catalog (Releases): View and manage all your music submissions.
+- Artists: Create and manage artist profiles. Each release must be linked to an artist.
+- Labels / Sub-Labels: Manage your publishing entities and hierarchy.
+- Correction Queue: Specifically for releases marked as "Needs Info" that require your attention.
+- Notices: A dedicated space for all official communications from DigitalSight.
+- Support & FAQ: Access help documentation or contact the support team.
+- Settings: Manage your profile, password, and account preferences.
+
+3. CREATING A RELEASE (STEP-BY-STEP)
+------------------------------------
+Creating a release involves a 7-step process to ensure all metadata is accurate for global distribution.
+
+Step 1: General Information
+- Album Title: The official name of the release.
+- Album Type: Choose between Album or Film (Single).
+- Content Type: Single, Album, Compilation, or Remix.
+- Artists: Select Primary and Featured artists from your managed list.
+
+Step 2: Commercial Metadata
+- UPC/EAN: Universal Product Code. Leave blank to auto-generate.
+- Catalogue Number: Your internal tracking number (e.g., DS-001).
+- Release Date: Must be at least 3 DAYS from the current date.
+- P-Line & C-Line: Phonographic and Composition copyright lines (e.g., 2024 DigitalSight).
+- Publisher: The entity owning the publishing rights.
+
+Step 3: Genre & Mood
+- Primary & Sub-Genre: Accurate categorization helps in store placement.
+- Core Mood: Helps in playlisting (e.g., Happy, Energetic).
+- Language: The primary language of the lyrics.
+- Parental Advisory: Mark as "Explicit" if the content contains strong language.
+
+Step 4: Film Sync (Optional)
+- Metadata for cinematic releases, including Director, Producer, Studio, and Star Cast.
+
+Step 5: Tracklist
+- Track Title & Version: (e.g., "Song Name (Radio Edit)").
+- ISRC: International Standard Recording Code. Leave blank to auto-generate.
+- Composer & Lyricist: Full legal names are mandatory.
+- Audio Upload: High-fidelity WAV masters only.
+- CRBT: Details for Caller Ring Back Tones (Title and Duration).
+
+Step 6: Artwork
+- Requirements: 3000 x 3000 pixels, Square, JPEG or PNG format.
+- YouTube Content ID: Option to enable digital fingerprinting protection.
+
+Step 7: Review & Submit
+- Final Review: Check all data for accuracy.
+- Submission Note: Add any technical context for the auditors.
+- Execute Ingest: Submit the release for review.
+
+4. RELEASE STATUSES
+-------------------
+- Draft: Saved locally. Not yet submitted for review.
+- Pending: Submitted and waiting for the DigitalSight team to audit.
+- Needs Info: Correction requested. Check the "Journal Memo" or "Admin Notes" for details.
+- Approved: Passed audit and ready for ingestion.
+- Processed: Successfully ingested into the distribution system.
+- Published: The release is LIVE on digital stores (Spotify, Apple Music, etc.).
+- Rejected: Denied for distribution (usually due to copyright or quality issues).
+- Takedown: The release has been removed from stores.
+- Cancelled: Submission cancelled by the user or admin.
+
+5. WAITING PERIODS & SUBMISSION
+-------------------------------
+- Minimum Lead Time: Releases must be submitted at least 3 days before the release date. For best results and playlist consideration, 2-3 weeks is recommended.
+- Review Time: The DigitalSight team typically reviews submissions within 24-72 hours.
+- Store Processing: Once "Processed", stores may take 24-48 hours to reflect the release.
+
+6. REQUIRED DATA CHECKLIST
+--------------------------
+Before submitting, ensure you have:
+[ ] High-quality WAV audio files.
+[ ] 3000x3000px Cover Art.
+[ ] Legal names of all Composers and Lyricists.
+[ ] Artist IDs (Spotify/Apple) if available.
+[ ] Correct P-Line and C-Line information.
+
+For further assistance, please visit the Support page or contact your Account Manager.

@@ -557,7 +557,7 @@ const PartnerReleaseDetailView: React.FC<{
                         </CardContent>
                     </Card>
 
-                    <Card>
+                   {/*  <Card>
                         <CardHeader className="border-b border-gray-800/50 pb-4">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-sm uppercase tracking-widest font-black">Live Distribution Status</CardTitle>
@@ -590,7 +590,7 @@ const PartnerReleaseDetailView: React.FC<{
                                 ))}
                             </div>
                         </CardContent>
-                    </Card>
+                    </Card> */}
                 </div>
             </div>
         </div>
